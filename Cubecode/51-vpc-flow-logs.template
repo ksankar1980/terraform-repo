@@ -1,0 +1,289 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This is a template that deploys AWS resources to allow VPC log events to flow into the central logging infrastructure created in the logging-base template. This script was developed by Cube Networks, and is based on scripts developed by Amazon Web Service. March 2017",
+    "Metadata": {
+        "License": "Any code, applications, scripts, templates, proofs of concept, documentation and other items provided by Cube Networks under this SOW are \"Cube Networks content.\" All such content is provided by Cube Networks and is subject to the terms of the Agreement. The Customer is solely responsible for using, deploying, testing, and supporting any code and applications provided by Cube Networks under this SOW."
+    },
+    "Outputs": {
+        "VPCFlowLogGroup": {
+            "Description": "Log group where VPC Flow logs are stored in console.",
+            "Value": {
+                "Ref": "VPCFlowLogGroup"
+            }
+        },
+        "VPCFlowToCloudwatchRole": {
+            "Description": "IAM role to allow VPC flow to deliver logs to CloudWatch.",
+            "Value": {
+                "Ref": "VPCFlowToCloudwatchRole"
+            }
+        },
+        "CloudWatchToKinesisRole": {
+            "Description": "IAM Role for CloudWatch Logs service to write to Kinesis Firehose.",
+            "Value": {
+                "Ref": "CloudWatchToKinesisRole"
+            }
+        }
+    },
+    "Parameters": {
+        "VPCId": {
+            "Description": "VPCID to log traffic flows from",
+            "Type": "AWS::EC2::VPC::Id"
+        },
+        "VPCFlowLogsBucket": {
+            "Description": "Destination bucket for VPC Flow log files.",
+            "Type": "String"
+        },
+        "KMSKeyArn": {
+            "Description": "AWS Key Management Service Key for encrypting VPC Flow Logs on S3.",
+            "Type": "String"
+        },
+        "NotificationEmail": {
+            "Description": "Email address to recieve SNS Alerts from CloudWatch VPC Flow Log log delivery events.",
+            "Type": "String"
+        },
+        "KinesisToS3RoleArn": {
+            "Description": "Full canonical name for Kinesis Role, enabling Kinesis Firehose to access S3 bucket",
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "VPCFlowExportSubscriptionFilter": {
+            "Metadata": {
+                "Use": "Pushes logs from VPC Flow/Cloudwatch to the Centralized logging destination.",
+                "Comments": "Utilizes the VPCCrossAccountLogDestination created in the base logging template of the management cloudformation templates.\n"
+            },
+            "Properties": {
+                "DestinationArn": {
+                    "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:destination:${VPCFlowLogDestination}"
+                },
+                "FilterPattern": "",
+                "LogGroupName": {
+                    "Ref": "VPCFlowLogGroup"
+                }
+            },
+            "Type": "AWS::Logs::SubscriptionFilter"
+        },
+        "VPCFlowLogGroup": {
+            "Metadata": {
+                "Use": "Log group for VPC flow logs.",
+                "Comments": "Allows searching and filtering of the last 14 days worth of VPC flow logs in the console.\n"
+            },
+            "Properties": {
+                "RetentionInDays": 14
+            },
+            "Type": "AWS::Logs::LogGroup"
+        },
+        "VPCFlowLogs": {
+            "Metadata": {
+                "Use": "VPC Flow Log",
+                "Comments": "VPC Flow Logs is a feature that enables you to capture information about the IP traffic going to and from network interfaces in your VPC. Flow log data is stored using Amazon CloudWatch Logs. \nFlow logs can help you with a number of tasks; for example, to troubleshoot why specific traffic is not reaching an instance, which in turn can help you diagnose overly restrictive security group rules. You can also use flow logs as a security tool to monitor the traffic that is reaching your instance.\n"
+            },
+            "Properties": {
+                "DeliverLogsPermissionArn": {
+                    "Fn::GetAtt": [
+                        "VPCFlowToCloudwatchRole",
+                        "Arn"
+                    ]
+                },
+                "LogGroupName": {
+                    "Ref": "VPCFlowLogGroup"
+                },
+                "ResourceId": {
+                    "Ref": "VPCId"
+                },
+                "ResourceType": "VPC",
+                "TrafficType": "ALL"
+            },
+            "Type": "AWS::EC2::FlowLog"
+        },
+        "VPCFlowLogDestination": {
+            "Metadata": {
+                "Use": "Logical target for VPC Flow Logs",
+                "Comments": "Allows this account to drop VPC flow logs into Cloudwatch Logs/Kinesis for archival.\n"
+            },
+            "Properties": {
+                "DestinationName": "VPCFlowLogDestination",
+                "DestinationPolicy": {
+                    "Fn::Sub": "{\n  \"Version\" : \"2012-10-17\",\n  \"Statement\" : [\n    {\n      \"Effect\" : \"Allow\", \n      \"Principal\": {\n        \"AWS\" : [\n          \"${AWS::AccountId}\"\n   ]\n      },\n      \"Action\" : \"logs:PutSubscriptionFilter\", \n      \"Resource\" : \"arn:aws:logs:${AWS::Region}:${AWS::AccountId}:destination:VPCFlowLogDestination\"\n    }\n  ]\n}\n"
+                },
+                "RoleArn": {
+                    "Fn::GetAtt": [
+                        "CloudWatchToKinesisRole",
+                        "Arn"
+                    ]
+                },
+                "TargetArn": {
+                    "Fn::Sub": "arn:aws:firehose:${AWS::Region}:${AWS::AccountId}:deliverystream/${VPCFlowLogKinesis}"
+                }
+            },
+            "Type": "AWS::Logs::Destination"
+        },
+        "VPCFlowToCloudwatchRole": {
+            "Metadata": {
+                "Use": "IAM role for the vpc-flow-logs service.",
+                "Comments": "Allows only access to the specific logs group created for VPC flow logs.\n"
+            },
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRole"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "vpc-flow-logs.amazonaws.com"
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyDocument": {
+                            "Statement": [
+                                {
+                                    "Action": [
+                                        "logs:DescribeLogGroups",
+                                        "logs:DescribeLogStreams"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Action": [
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": {
+                                        "Fn::GetAtt": [
+                                            "VPCFlowLogGroup",
+                                            "Arn"
+                                        ]
+                                    }
+                                }
+                            ],
+                            "Version": "2012-10-17"
+                        },
+                        "PolicyName": "vpcflowcwlogs"
+                    }
+                ]
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "CloudWatchToKinesisRole": {
+            "Metadata": {
+                "Use": "IAM Role to allow Cloudwatch Logs to write to Kinesis for real time log processing and archival.",
+                "Comments": "Role only allows for access to the specific Kinesis Stream.\n"
+            },
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRole"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    { "Fn::Sub": "logs.${AWS::Region}.amazonaws.com"}
+                                ]
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyDocument": {
+                            "Statement": [
+                                {
+                                    "Action": [
+                                        "firehose:DescribeDeliveryStream",
+                                        "firehose:PutRecord",
+                                        "firehose:PutRecordBatch"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": {
+                                        "Fn::Sub": "arn:aws:firehose:${AWS::Region}:${AWS::AccountId}:deliverystream/${VPCFlowLogKinesis}"
+                                    }
+                                }
+                            ],
+                            "Version": "2012-10-17"
+                        },
+                        "PolicyName": "root"
+                    }
+                ]
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "VPCFlowLogKinesis": {
+            "Metadata": {
+                "Use": "Kinesis resources to archive VPC logs to S3, can later be used for real time processing of VPC flows events.",
+                "Comments": "See http://docs.aws.amazon.com/firehose/latest/dev/what-is-this-service.html for more information about how you can utilize this functionality.\n"
+            },
+            "Properties": {
+                "DeliveryStreamName": "VPCFlowLogExport",
+                "S3DestinationConfiguration": {
+                    "BucketARN": {
+                        "Fn::Sub": "arn:aws:s3:::${VPCFlowLogsBucket}"
+                    },
+                    "BufferingHints": {
+                        "IntervalInSeconds": 300,
+                        "SizeInMBs": 5
+                    },
+                    "CloudWatchLoggingOptions": {
+                        "Enabled": true,
+                        "LogGroupName": {
+                            "Ref": "KinesisToS3ErrorLogGroup"
+                        },
+                        "LogStreamName": {
+                            "Ref": "KinesisToS3ErrorLogGroupStream"
+                        }
+                    },
+                    "CompressionFormat": "GZIP",
+                    "EncryptionConfiguration": {
+                        "KMSEncryptionConfig": {
+                            "AWSKMSKeyARN": {
+                                "Ref": "KMSKeyArn"
+                            }
+                        }
+                    },
+                    "Prefix": {
+                        "Fn::Sub": "AWSLogs/${AWS::AccountId}/VPCFlowLogs/"
+                    },
+                    "RoleARN": {
+                        "Ref": "KinesisToS3RoleArn"
+                    }
+                }
+            },
+            "Type": "AWS::KinesisFirehose::DeliveryStream"
+        },
+        "KinesisToS3ErrorLogGroup": {
+            "Metadata": {
+                "Use": "CloudWatch error log group for Kinesis Firehose writing to S3.",
+                "Comments": "Allows Firehose to publish CloudWatch error logs about S3 uploads.\n"
+            },
+            "Properties": {
+                "RetentionInDays": 14
+            },
+            "Type": "AWS::Logs::LogGroup"
+        },
+        "KinesisToS3ErrorLogGroupStream": {
+            "Metadata": {
+                "Use": "CloudWatch error logstream for Kinesis Firehose writing to S3.",
+                "Comments": "Allows Firehose to publish CloudWatch error logs about S3 uploads.\n"
+            },
+            "Properties": {
+                "LogGroupName": {
+                    "Ref": "KinesisToS3ErrorLogGroup"
+                },
+                "LogStreamName": "KinesisToS3ErrorLogGroupStream"
+            },
+            "Type": "AWS::Logs::LogStream"
+        }
+    }
+}

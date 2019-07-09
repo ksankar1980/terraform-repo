@@ -1,0 +1,57 @@
+{
+  "AWSTemplateFormatVersion":"2010-09-09",
+  "Description":"This is a template that creates the IAM breakglass user and Group-IAMBreakglass group. This script was developed by Cube Networks, and is based on scripts developed by Amazon Web Service. March 2017",
+  "Metadata":{
+    "License": "Any code, applications, scripts, templates, proofs of concept, documentation and other items provided by Cube Networks under this SOW are \"Cube Networks content.\" All such content is provided by Cube Networks and is subject to the terms of the Agreement. The Customer is solely responsible for using, deploying, testing, and supporting any code and applications provided by Cube Networks under this SOW."
+  },
+  "Parameters":{
+    "IAMUserPassword":{
+      "NoEcho":"true",
+      "Description":"Please specify the password for the IAM breakglass user. Minimum 14 characters, at least one uppercase letter, one lowercase letter, one number and one special character",
+      "Type":"String",
+      "AllowedPattern": "(?=^.{14,255}$)((?=.*\\d)(?=.*[A-Z])(?=.*[a-z])|(?=.*\\d)(?=.*[^A-Za-z0-9])(?=.*[a-z])|(?=.*[^A-Za-z0-9])(?=.*[A-Z])(?=.*[a-z])|(?=.*\\d)(?=.*[A-Z])(?=.*[^A-Za-z0-9]))^.*"
+    },
+    "IAMUserPassword2":{
+      "NoEcho":"true",
+      "Description":"Please specify the password for the IAM breakglass user. Minimum 14 characters, at least one uppercase letter, one lowercase letter, one number and one special character",
+      "Type":"String",
+      "AllowedPattern": "(?=^.{14,255}$)((?=.*\\d)(?=.*[A-Z])(?=.*[a-z])|(?=.*\\d)(?=.*[^A-Za-z0-9])(?=.*[a-z])|(?=.*[^A-Za-z0-9])(?=.*[A-Z])(?=.*[a-z])|(?=.*\\d)(?=.*[A-Z])(?=.*[^A-Za-z0-9]))^.*"
+    }
+  },
+  "Resources":{
+    "IAMGroup":{
+      "Metadata": {
+          "Use": "A IAM Group to which the Breakglass user will belong to.",
+          "Comments": "As a best pratice, policies should be attached to groups and users be part of a group. Users in this group and will have the AdministratorAccess policy attached"
+      },
+      "Type":"AWS::IAM::Group",
+      "Properties":{
+        "GroupName":"Group-IAMBreakglass",
+        "ManagedPolicyArns":[
+          "arn:aws:iam::aws:policy/AdministratorAccess"
+        ],
+        "Path":"/"
+      }
+    },
+    "IAMUser":{
+      "Metadata": {
+          "Use": "The IAM breakglass user.",
+          "Comments": "This user will belong to the Group-IAMBreakglass group."
+      },
+      "Type":"AWS::IAM::User",
+      "Properties":{
+        "Groups":[
+          "Group-IAMBreakglass"
+        ],
+        "LoginProfile":{
+          "Password":{
+            "Ref":"IAMUserPassword"
+          }
+        },
+        "Path":"/",
+        "UserName":"IAMBreakglass"
+      },
+      "DependsOn" : "IAMGroup"
+    }
+  }
+}

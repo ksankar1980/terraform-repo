@@ -1,0 +1,603 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "This is a template that creates 4 samples security groups for EC2 instances. Using the Security Groups configured below, resources in the VPC will be reacheable from Internet if they belong to the public subnets of the DevOps account. For all other accounts, resources in the public subnets will be reacheable only from the DevOps VPC. This script was developed by Cube Networks, and is based on scripts developed by Amazon Web Service. March 2017",
+  "Metadata": {
+    "License": "Any code, applications, scripts, templates, proofs of concept, documentation and other items provided by Cube Networks under this SOW are \"Cube Networks content.\" All such content is provided by Cube Networks and is subject to the terms of the Agreement. The Customer is solely responsible for using, deploying, testing, and supporting any code and applications provided by Cube Networks under this SOW."
+  },
+  "Conditions": {
+      "IsDevOpsAccount": {
+          "Fn::Equals": [
+              "True",
+              {
+                  "Ref": "pIsDevOpsAccount"
+              }
+          ]
+      },
+      "IsNotDevOpsAccount": {
+          "Fn::Equals": [
+              "False",
+              {
+                  "Ref": "pIsDevOpsAccount"
+              }
+          ]
+      }
+  },
+  "Parameters": {
+    "Environment": {
+      "AllowedValues": [
+        "Development",
+        "Integration",
+        "Production",
+        "Sandbox"
+      ],
+      "Description": "Which environment is this SG related to (Development, Integration, Production, Sandbox)",
+      "Type": "String"
+    },
+    "VpcId": {
+      "Description": "VPC to atttach SG to",
+      "Type": "AWS::EC2::VPC::Id"
+    },
+    "CostCenter": {
+      "Description": "Cost Center",
+      "Type": "String"
+    },
+    "Cluster": {
+      "Description": "Application Cluster which the SG belongs to",
+      "Type": "String"
+    },
+    "InfoSec": {
+      "Description": "Reserved for Infosec",
+      "Type": "String"
+    },
+    "pIsDevOpsAccount": {
+      "Description": "Specify if this is the DevOps account or not",
+      "Type": "String"
+    },
+    "DevOpsVPCCIDR": {
+      "Description": "The CIDR of the DevOps account VPC",
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "SecurityGroupPublicSubnetsLinuxDevOps": {
+      "Condition" : "IsDevOpsAccount",
+      "Metadata": {
+        "Use": "General Instance SecurityGroup for Linux instances deployed into the public subnets of the devops account.<br>WARNING: in the current implementation, SSH IS OPEN TO THE WORLD!",
+        "Comments": "Defines ports needed admin.  Currently only 22 to RFC 1918 is allowed in with this SecurityGroup."
+      },
+      "Properties": {
+        "GroupDescription": "Allow ssh to client host",
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "FromPort": "22",
+            "IpProtocol": "tcp",
+            "ToPort": "22"
+          }
+        ],
+        "VpcId": {
+          "Ref": "VpcId"
+        },
+        "Tags": [
+          {
+            "Key": "CostCenter",
+            "Value": {
+              "Ref": "CostCenter"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "Cluster",
+            "Value": {
+              "Ref": "Cluster"
+            }
+          },
+          {
+            "Key": "InfoSec",
+            "Value": {
+              "Ref": "InfoSec"
+            }
+          },
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-${Environment}-Public-Linux-SecurityGroup"
+            }
+          }
+        ]
+      },
+      "Type": "AWS::EC2::SecurityGroup"
+    },
+    "SecurityGroupPublicSubnetsLinux": {
+      "Condition" : "IsNotDevOpsAccount",
+      "Metadata": {
+        "Use": "General Instance SecurityGroup for Linux instances deployed into the public subnets. SSH is accepted only from DevOps network",
+        "Comments": "Defines ports needed admin.  Currently only 22 to RFC 1918 is allowed in with this SecurityGroup.\n"
+      },
+      "Properties": {
+        "GroupDescription": "Allow ssh to client host",
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": {"Ref": "DevOpsVPCCIDR"},
+            "FromPort": "22",
+            "IpProtocol": "tcp",
+            "ToPort": "22"
+          }
+        ],
+        "VpcId": {
+          "Ref": "VpcId"
+        },
+        "Tags": [
+          {
+            "Key": "CostCenter",
+            "Value": {
+              "Ref": "CostCenter"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "Cluster",
+            "Value": {
+              "Ref": "Cluster"
+            }
+          },
+          {
+            "Key": "InfoSec",
+            "Value": {
+              "Ref": "InfoSec"
+            }
+          },
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-${Environment}-Public-Linux-SecurityGroup"
+            }
+          }
+        ]
+      },
+      "Type": "AWS::EC2::SecurityGroup"
+    },
+    "SecurityGroupPublicSubnetsWindowsDevOps": {
+      "Condition" : "IsDevOpsAccount",
+      "Metadata": {
+        "Use": "General Instance SecurityGroup for Windows instances deployed into the public subnets of DevOps account<br>WARNING: in the current implementation, RDP IS OPEN TO THE WORLD!",
+        "Comments": "Defines ports needed admin.  Currently only 3389 to RFC 1918 is allowed in with this SecurityGroup.\n"
+      },
+      "Properties": {
+        "GroupDescription": "Allow RDP to client host",
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "FromPort": "3389",
+            "IpProtocol": "tcp",
+            "ToPort": "3389"
+          }
+        ],
+        "VpcId": {
+          "Ref": "VpcId"
+        },
+        "Tags": [
+          {
+            "Key": "CostCenter",
+            "Value": {
+              "Ref": "CostCenter"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "Cluster",
+            "Value": {
+              "Ref": "Cluster"
+            }
+          },
+          {
+            "Key": "InfoSec",
+            "Value": {
+              "Ref": "InfoSec"
+            }
+          },
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-${Environment}-Public-Windows-SecurityGroup"
+            }
+          }
+        ]
+      },
+      "Type": "AWS::EC2::SecurityGroup"
+    },
+    "SecurityGroupPublicSubnetsWindows": {
+      "Condition" : "IsNotDevOpsAccount",
+      "Metadata": {
+        "Use": "General Instance SecurityGroup for Windows instances deployed into the public subnets of DevOps account.",
+        "Comments": "Defines ports needed admin.  Currently only 3389 to RFC 1918 is allowed in with this SecurityGroup.\n"
+      },
+      "Properties": {
+        "GroupDescription": "Allow RDP to client host",
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": {"Ref": "DevOpsVPCCIDR"},
+            "FromPort": "3389",
+            "IpProtocol": "tcp",
+            "ToPort": "3389"
+          }
+        ],
+        "VpcId": {
+          "Ref": "VpcId"
+        },
+        "Tags": [
+          {
+            "Key": "CostCenter",
+            "Value": {
+              "Ref": "CostCenter"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "Cluster",
+            "Value": {
+              "Ref": "Cluster"
+            }
+          },
+          {
+            "Key": "InfoSec",
+            "Value": {
+              "Ref": "InfoSec"
+            }
+          },
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-${Environment}-Public-Windows-SecurityGroup"
+            }
+          }
+        ]
+      },
+      "Type": "AWS::EC2::SecurityGroup"
+    },
+    "SecurityGroupPrivateSubnetsWindows": {
+      "Metadata": {
+        "Use": "General Instance SecurityGroup for Windows instances deployed into the private subnets.",
+        "Comments": "Defines ports needed admin.  Currently only 3389 to RFC 1918 is allowed in with this SecurityGroup.\n"
+      },
+      "Properties": {
+        "GroupDescription": "Allow RDP to client host",
+        "VpcId": {
+          "Ref": "VpcId"
+        },
+        "Tags": [
+          {
+            "Key": "CostCenter",
+            "Value": {
+              "Ref": "CostCenter"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "Cluster",
+            "Value": {
+              "Ref": "Cluster"
+            }
+          },
+          {
+            "Key": "InfoSec",
+            "Value": {
+              "Ref": "InfoSec"
+            }
+          },
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-${Environment}-Private-Windows-SecurityGroup"
+            }
+          }
+        ]
+      },
+      "Type": "AWS::EC2::SecurityGroup"
+    },
+    "SecurityGroupPrivateSubnetsLinux": {
+      "Metadata": {
+        "Use": "General Instance SecurityGroup for Linux instances deployed into the private subnets.",
+        "Comments": "Defines ports needed admin.  Currently only 22 to RFC 1918 is allowed in with this SecurityGroup.\n"
+      },
+      "Properties": {
+        "GroupDescription": "Allow ssh to client host",
+        "VpcId": {
+          "Ref": "VpcId"
+        },
+        "Tags": [
+          {
+            "Key": "CostCenter",
+            "Value": {
+              "Ref": "CostCenter"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "Cluster",
+            "Value": {
+              "Ref": "Cluster"
+            }
+          },
+          {
+            "Key": "InfoSec",
+            "Value": {
+              "Ref": "InfoSec"
+            }
+          },
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${AWS::StackName}-${Environment}-Private-Linux-SecurityGroup"
+            }
+          }
+        ]
+      },
+      "Type": "AWS::EC2::SecurityGroup"
+    },
+    "IngressFromSecurityGroupPublicSubnetsLinuxToLinux": {
+      "Metadata": {
+        "Use": "This rules allow connection from Linux instances SG to Linux instances in the private subnets for non-DevOps accounts"
+      },
+      "Condition" : "IsNotDevOpsAccount",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "22",
+        "ToPort": "22",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPublicSubnetsLinux",
+            "GroupId"
+          ]
+        },
+        "GroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPrivateSubnetsLinux",
+            "GroupId"
+          ]
+        }
+      }
+    },
+    "IngressFromSecurityGroupPublicSubnetsLinuxToWindows": {
+      "Metadata": {
+        "Use": "This rules allow connection from Linux instances SG to Windows instances in the private subnets for non-DevOps accounts"
+      },
+      "Condition" : "IsNotDevOpsAccount",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "3389",
+        "ToPort": "3389",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPublicSubnetsLinux",
+            "GroupId"
+          ]
+        },
+        "GroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPrivateSubnetsWindows",
+            "GroupId"
+          ]
+        }
+      }
+    },
+    "IngressFromSecurityGroupPublicSubnetsDevOpsLinuxToLinux": {
+      "Metadata": {
+        "Use": "This rules allow connection from Linux instances SG to Linux instances in the private subnets for the DevOps accounts"
+      },
+      "Condition" : "IsDevOpsAccount",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "22",
+        "ToPort": "22",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPublicSubnetsLinuxDevOps",
+            "GroupId"
+          ]
+        },
+        "GroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPrivateSubnetsLinux",
+            "GroupId"
+          ]
+        }
+      }
+    },
+    "IngressFromSecurityGroupPublicSubnetsDevOpsLinuxToWindows": {
+      "Metadata": {
+        "Use": "This rules allow connection from Linux instances SG to Windows instances in the private subnets for the DevOps accounts"
+      },
+      "Condition" : "IsDevOpsAccount",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "3389",
+        "ToPort": "3389",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPublicSubnetsLinuxDevOps",
+            "GroupId"
+          ]
+        },
+        "GroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPrivateSubnetsWindows",
+            "GroupId"
+          ]
+        }
+      }
+    },
+    "IngressFromSecurityGroupPublicSubnetsWindowsToLinux": {
+      "Metadata": {
+        "Use": "This rules allow connection from Windows instances SG to Linux instances in the private subnets for non-DevOps accounts"
+      },
+      "Condition" : "IsNotDevOpsAccount",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "22",
+        "ToPort": "22",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPublicSubnetsWindows",
+            "GroupId"
+          ]
+        },
+        "GroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPrivateSubnetsLinux",
+            "GroupId"
+          ]
+        }
+      }
+    },
+    "IngressFromSecurityGroupPublicSubnetsWindowsToWindows": {
+      "Metadata": {
+        "Use": "This rules allow connection from Windows instances SG to Windows instances in the private subnets for non-DevOps accounts"
+      },
+      "Condition" : "IsNotDevOpsAccount",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "3389",
+        "ToPort": "3389",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPublicSubnetsWindows",
+            "GroupId"
+          ]
+        },
+        "GroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPrivateSubnetsWindows",
+            "GroupId"
+          ]
+        }
+      }
+    },
+    "IngressFromSecurityGroupPublicSubnetsDevOpsWindowsToLinux": {
+      "Metadata": {
+        "Use": "This rules allow connection from Windos instances SG to Linux instances in the private subnets for the DevOps accounts"
+      },
+      "Condition" : "IsDevOpsAccount",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "22",
+        "ToPort": "22",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPublicSubnetsWindowsDevOps",
+            "GroupId"
+          ]
+        },
+        "GroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPrivateSubnetsLinux",
+            "GroupId"
+          ]
+        }
+      }
+    },
+    "IngressFromSecurityGroupPublicSubnetsDevOpsWindowsToWindows": {
+      "Metadata": {
+        "Use": "This rules allow connection from Windows instances SG to Windows instances in the private subnets for non-DevOps accounts"
+      },
+      "Condition" : "IsDevOpsAccount",
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties":{
+        "IpProtocol": "tcp",
+        "FromPort": "3389",
+        "ToPort": "3389",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPublicSubnetsWindowsDevOps",
+            "GroupId"
+          ]
+        },
+        "GroupId": {
+          "Fn::GetAtt": [
+            "SecurityGroupPrivateSubnetsWindows",
+            "GroupId"
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "SecurityGroupPublicSubnetsLinuxDevOps": {
+      "Condition" : "IsDevOpsAccount",
+      "Description": "SecurityGroup for Linux instances deployed into the public subnets of the DevOps account.",
+      "Value": {
+        "Ref": "SecurityGroupPublicSubnetsLinuxDevOps"
+      }
+    },
+    "SecurityGroupPublicSubnetsLinux": {
+      "Condition" : "IsNotDevOpsAccount",
+      "Description": "SecurityGroup for Linux instances deployed into the public subnets of a generic account (except for DevOps one)",
+      "Value": {
+        "Ref": "SecurityGroupPublicSubnetsLinux"
+      }
+    },
+    "SecurityGroupPublicSubnetsWindowsDevOps": {
+      "Condition" : "IsDevOpsAccount",
+      "Description": "SecurityGroup for Windows instances deployed into the public subnets of the DevOps account. ",
+      "Value": {
+        "Ref": "SecurityGroupPublicSubnetsWindowsDevOps"
+      }
+    },
+    "SecurityGroupPublicSubnetsWindows": {
+      "Condition" : "IsNotDevOpsAccount",
+      "Description": "SecurityGroup for Windows instances deployed into the public subnets of a generic account (except for DevOps one).",
+      "Value": {
+        "Ref": "SecurityGroupPublicSubnetsWindows"
+      }
+    },
+    "SecurityGroupPrivateSubnetsLinux": {
+      "Description": "SecurityGroup for Linux instances deployed into the private subnets of a generic account (except for DevOps one).",
+      "Value": {
+        "Ref": "SecurityGroupPrivateSubnetsLinux"
+      }
+    },
+    "SecurityGroupPrivateSubnetsWindows": {
+      "Description": "SecurityGroup for Windows instances deployed into the private subnets of a generic account (except for DevOps one).",
+      "Value": {
+        "Ref": "SecurityGroupPrivateSubnetsWindows"
+      }
+    }
+  }
+}

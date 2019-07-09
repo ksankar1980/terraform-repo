@@ -1,0 +1,1032 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This is a template that contains resources to create a new VPC. It allows for the conditional attachment of an IGW, as well as creates the appropirate resources for NAT, Direct Connect and Active Directory integration based on the input parameters. This script was developed by Cube Networks, and is based on scripts developed by Amazon Web Service. March 2017",
+    "Metadata": {
+        "License": "Any code, applications, scripts, templates, proofs of concept, documentation and other items provided by Cube Networks under this SOW are \"Cube Networks content.\" All such content is provided by Cube Networks and is subject to the terms of the Agreement. The Customer is solely responsible for using, deploying, testing, and supporting any code and applications provided by Cube Networks under this SOW."
+    },
+    "Conditions": {
+        "IGW": {
+            "Fn::Equals": [
+                "True",
+                {
+                    "Ref": "AttachIGW"
+                }
+            ]
+        },
+        "IsNotDevOpsAccount": {
+            "Fn::Equals": [
+                "False",
+                {
+                    "Ref": "pIsDevOpsAccount"
+                }
+            ]
+        },
+        "IsDevOpsAccount": {
+            "Fn::Equals": [
+                "True",
+                {
+                    "Ref": "pIsDevOpsAccount"
+                }
+            ]
+        }
+    },
+    "Outputs": {
+        "VPC":{
+            "Description": "The VPC ID (vpc-xxxxxxxx).",
+            "Value": {
+                "Ref": "VPC"
+            }
+        },
+        "DirectConnectVGW": {
+            "Description": "The VPC Virtual Gateway ID (igw-xxxxxxxx)",
+            "Value": {
+                "Ref": "DirectConnectVGW"
+            }
+        },
+        "ManagedNatGW1": {
+            "Description": "The logical name of the NAT gateway, in the Availability Zone 1 (nat-xxxxxxxxxxxxxxxxx)",
+            "Condition": "IGW",
+            "Value": {
+                "Ref": "ManagedNatGW1"
+            }
+        },
+        "ManagedNatGW1EIP": {
+            "Description": "The public IPv4 Address of the NAT gateway, in the Availability Zone 1",
+            "Condition": "IGW",
+            "Value": {
+                "Ref": "ManagedNatGW1EIP"
+            }
+        },
+        "ManagedNatGW2": {
+            "Description": "The logical name of the NAT gateway, in the Availability Zone 2 (nat-xxxxxxxxxxxxxxxxx)",
+            "Condition": "IGW",
+            "Value": {
+                "Ref": "ManagedNatGW2"
+            }
+        },
+        "ManagedNatGW2EIP": {
+          "Description": "The public IPv4 Address of the NAT gateway, in the Availability Zone 1",
+            "Condition": "IGW",
+            "Value": {
+                "Ref": "ManagedNatGW2EIP"
+            }
+        },
+        "PrivateRTBAZ1": {
+            "Description": "Route Table for the private subnet, in the Availability Zone 1 (rtb-xxxxxxxx)",
+            "Value": {
+                "Ref": "PrivateRTBAZ1"
+            }
+        },
+        "PrivateRTBAZ2": {
+            "Description": "Route Table for the private subnet, in the Availability Zone 2 (rtb-xxxxxxxx)",
+            "Value": {
+                "Ref": "PrivateRTBAZ2"
+            }
+        },
+        "PrivateSubnetAZ1": {
+            "Description": "Private subnet, in the Availability Zone 1 (subnet-xxxxxxxx)",
+            "Value": {
+                "Ref": "PrivateSubnetAZ1"
+            }
+        },
+        "PrivateSubnetAZ2": {
+            "Description": "Private subnet, in the Availability Zone 2 (subnet-xxxxxxxx)",
+            "Value": {
+                "Ref": "PrivateSubnetAZ2"
+            }
+        },
+        "PublicRTB": {
+            "Description": "Route Table for the public subnet (subnet-xxxxxxxx)",
+            "Value": {
+                "Ref": "PublicRTB"
+            }
+        },
+        "PublicSubnetAZ1": {
+            "Description": "Public subnet, in the Availability Zone 1 (subnet-xxxxxxxx). It will be created only for non DevOps accounts",
+            "Condition" : "IsNotDevOpsAccount",
+            "Value": {
+                "Ref": "PublicSubnetAZ1"
+            }
+        },
+        "PublicSubnetAZ2": {
+            "Description": "Public subnet, in the Availability Zone 2 (subnet-xxxxxxxx). It will be created only for non DevOps accounts",
+            "Condition" : "IsNotDevOpsAccount",
+            "Value": {
+                "Ref": "PublicSubnetAZ2"
+            }
+        },
+        "PublicSubnetAZ1DevOps": {
+            "Description": "Public subnet, in the Availability Zone 1 (subnet-xxxxxxxx). Specific for DevOps account",
+            "Condition" : "IsDevOpsAccount",
+            "Value": {
+                "Ref": "PublicSubnetAZ1DevOps"
+            }
+        },
+        "PublicSubnetAZ2DevOps": {
+            "Description": "Public subnet, in the Availability Zone 2 (subnet-xxxxxxxx). Specific for DevOps account",
+            "Condition" : "IsDevOpsAccount",
+            "Value": {
+                "Ref": "PublicSubnetAZ2DevOps"
+            }
+        },
+        "VPCDHCPOptions": {
+            "Description": "The DHCP Option for the VPC (dopt-xxxxxxxx)",
+            "Value": {
+                "Ref": "VPCDHCPOptions"
+            }
+        },
+        "VPCIGW": {
+            "Description": "The ID of the VPC Internet Gateway (igw-xxxxxxxx)",
+            "Value": {
+                "Ref": "VPCIGW"
+            }
+        },
+        "ToDevOpsPeeringConnection" : {
+          "Description": "The ID of the peering connection to the DevOps VPC (pcx-xxxxxxxx).",
+          "Condition": "IsNotDevOpsAccount",
+           "Value": {
+              "Ref": "ToDevOpsPeeringConnection"
+           }
+        }
+    },
+    "Parameters": {
+        "AttachIGW": {
+            "Default": "True",
+            "Description": "If True, the template will create an Internet Gateway and NAT Gateways to allow egress traffic to the Internet for EC2 instances in the private subnets.",
+            "Type": "String"
+        },
+        "DNSServers": {
+            "Default": "AmazonProvidedDNS",
+            "Description": "DNS FOR AD - Set to values provided by AD Connector or the Address of On-Prem DNS.",
+            "Type": "String"
+        },
+        "PrivateSubnetCIDRList": {
+            "Description": "Comma Delimited List of CIDR Ranges for the Private Subnets.  Maps to the first and second AZ respectively.",
+            "Type": "CommaDelimitedList"
+        },
+        "PublicSubnetCIDRList": {
+            "Description": "Comma Delimited List of CIDR Ranges for the Public Subnets.  Maps to the first and second AZ respectively.",
+            "Type": "CommaDelimitedList"
+        },
+        "VPCCIDR": {
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "Valid CIDR Block Required",
+            "Description": "VPC IP address space, RFC 1918 address space only.  Example: 10.0.0.0/20",
+            "MaxLength": "18",
+            "MinLength": "9",
+            "Type": "String"
+        },
+        "DomainNameDNS": {
+            "Type": "String",
+            "Description": "The domain name that will be automatically attached to the EC2 instances launched in this VPC.",
+            "Default": "DomainNameDNS_1",
+            "AllowedValues": [
+                "DomainNameDNS_1",
+                "DomainNameDNS_2",
+                "DomainNameDNS_3"
+            ]
+        },
+        "DevOpsVPCIDPeering" : {
+            "Type" : "String",
+            "Description" : "The DevOps account VPCID with which the peering connection will be created.",
+            "Default" : ""
+        },
+        "PeerRoleArn" : {
+          "Type" : "String",
+          "Description" : "The ARN of the role to be assumed for cross account VPC peering",
+          "Default" : ""
+        },
+        "PeerOwnerAWSAccountId" : {
+          "Type" : "String",
+          "Description" : "The DevOps AWS Account number, owning the VPC you want to peer with.",
+          "Default" : ""
+        },
+        "PeerDestinationCidrBlock" : {
+          "Description": "The VPC CIDR block of the DevOps VPC you want to peer whit. VPC IP address space, RFC 1918 address space only.  Example: 10.0.0.0/20.",
+          "Type": "String",
+          "Default" : ""
+        },
+        "pIsDevOpsAccount":{
+          "Description": "Determine if this account is the DevOps one.",
+          "Type": "String",
+          "Default" : "False"
+        }
+    },
+    "Resources": {
+        "DirectConnectVGW": {
+            "Metadata": {
+                "Use": "Target for Direct Connect VIF from on-premises",
+                "Comments": ""
+            },
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "DirectConnect"
+                    }
+                ],
+                "Type": "ipsec.1"
+            },
+            "Type": "AWS::EC2::VPNGateway"
+        },
+        "DirectConnectVGWAttach": {
+            "Metadata": {
+                "Use": "Attach VGW to VPC for direct connect.",
+                "Comments": "Links the Virtual Gateway for Direct Connect to the VPC to allow for creation of VIF.\n"
+            },
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "VpnGatewayId": {
+                    "Ref": "DirectConnectVGW"
+                }
+            },
+            "Type": "AWS::EC2::VPCGatewayAttachment"
+        },
+        "DirectConnectVGWRouteProp": {
+            "Metadata": {
+                "Use": "Allow BGP routes from direct connect to propagate to AWS.",
+                "Comments": "This is used so that the networking group can manage default routes back to on-prem automatically.\n"
+            },
+            "DependsOn": "DirectConnectVGWAttach",
+            "Properties": {
+                "RouteTableIds": [
+                    {
+                        "Ref": "PublicRTB"
+                    },
+                    {
+                        "Ref": "PrivateRTBAZ1"
+                    },
+                    {
+                        "Ref": "PrivateRTBAZ2"
+                    }
+                ],
+                "VpnGatewayId": {
+                    "Ref": "DirectConnectVGW"
+                }
+            },
+            "Type": "AWS::EC2::VPNGatewayRoutePropagation"
+        },
+        "InternetRouteThroughIGW": {
+            "Metadata": {
+                "Use": "Sets default IGW route for public subnets if an IGW is being attached to this VPC.",
+                "Comments": "This is conditionally defined based on the value of the AttachIGW parameter.\n"
+            },
+            "Condition": "IGW",
+            "DependsOn": "VPCIGWAttachGateway",
+            "Properties": {
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "VPCIGW"
+                },
+                "RouteTableId": {
+                    "Ref": "PublicRTB"
+                }
+            },
+            "Type": "AWS::EC2::Route"
+        },
+        "ManagedNATRouteAZ1": {
+            "Metadata": {
+                "Use": "Route to allow AZ to access internet via AWS Managed NAT.",
+                "Comments": "This is only created if an IGW is attached to the VPC.  \nProvides a default route to all instances in subnets associated with this route table pointing at the AWS Managed NAT appliance.\n"
+            },
+            "Condition": "IGW",
+            "Properties": {
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": {
+                    "Ref": "ManagedNatGW1"
+                },
+                "RouteTableId": {
+                    "Ref": "PrivateRTBAZ1"
+                }
+            },
+            "Type": "AWS::EC2::Route"
+        },
+        "ManagedNATRouteAZ2": {
+            "Metadata": {
+                "Use": "Route to allow AZ to access internet via AWS Managed NAT.",
+                "Comments": "This is only created if an IGW is attached to the VPC.  \nProvides a default route to all instances in subnets associated with this route table pointing at the AWS Managed NAT appliance.\n"
+            },
+            "Condition": "IGW",
+            "Properties": {
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": {
+                    "Ref": "ManagedNatGW2"
+                },
+                "RouteTableId": {
+                    "Ref": "PrivateRTBAZ2"
+                }
+            },
+            "Type": "AWS::EC2::Route"
+        },
+        "ManagedNatGW1": {
+            "Metadata": {
+                "Use": "AWS Managed NAT Appliance for outbound internet connectivity from within private subnets.",
+                "Comments": "AWS Managed NAT appliance provides a scalable NAT interface for internet access from within your VPC.\nThis allows instances without public ip addresses to do things such as perform updates, etc.\n"
+            },
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "ManagedNatGW1EIP",
+                        "AllocationId"
+                    ]
+                },
+                "SubnetId": {
+                    "Fn::If" : [
+                      "IsDevOpsAccount",
+                      { "Ref": "PublicSubnetAZ1DevOps" },
+                      { "Ref": "PublicSubnetAZ1" }
+                    ]
+                }
+            },
+            "Type": "AWS::EC2::NatGateway"
+        },
+        "ManagedNatGW1EIP": {
+            "Metadata": {
+                "Use": "Static public IP address for the AWS NAT instance.",
+                "Comments": "This interface will not change over the lifetime of the NAT Instance.\n"
+            },
+            "Condition": "IGW",
+            "DependsOn": "VPCIGWAttachGateway",
+            "Properties": {
+                "Domain": "VPC"
+            },
+            "Type": "AWS::EC2::EIP"
+        },
+        "ManagedNatGW2": {
+            "Metadata": {
+                "Use": "AWS Managed NAT Appliance for outbound internet connectivity from within private subnets.",
+                "Comments": "AWS Managed NAT appliance provides a scalable NAT interface for internet access from within your VPC.  \nThis allows instances without public ip addresses to do things such as perform updates, etc.\n"
+            },
+            "Condition": "IGW",
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "ManagedNatGW2EIP",
+                        "AllocationId"
+                    ]
+                },
+                "SubnetId": {
+                    "Fn::If" : [
+                      "IsDevOpsAccount",
+                      { "Ref": "PublicSubnetAZ2DevOps" },
+                      { "Ref": "PublicSubnetAZ2" }
+                    ]
+                }
+            },
+            "Type": "AWS::EC2::NatGateway"
+        },
+        "ManagedNatGW2EIP": {
+            "Metadata": {
+                "Use": "Static public IP address for the AWS NAT instance.",
+                "Comments": "This interface will not change over the lifetime of the NAT Instance.\n"
+            },
+            "Condition": "IGW",
+            "DependsOn": "VPCIGWAttachGateway",
+            "Properties": {
+                "Domain": "VPC"
+            },
+            "Type": "AWS::EC2::EIP"
+        },
+        "PrivateRTBAZ1": {
+            "Metadata": {
+                "Use": "Route table for subnet in vpc.",
+                "Comments": "Routes for Managed NAT, Direct Connect, and public internet are placed her and made available to instances as their default route table.\n"
+            },
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": [
+                                "Private-${AZ}",
+                                {
+                                    "AZ": {
+                                        "Fn::Select": [
+                                            "0",
+                                            {
+                                                "Fn::GetAZs": {
+                                                    "Ref": "AWS::Region"
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "Type": "AWS::EC2::RouteTable"
+        },
+        "PrivateRTBAZ2": {
+            "Metadata": {
+                "Use": "Route table for subnet in vpc.",
+                "Comments": "Routes for Managed NAT, Direct Connect, and public internet are placed her and made available to instances as their default route table.\n"
+            },
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": [
+                                "Private-${AZ}",
+                                {
+                                    "AZ": {
+                                        "Fn::Select": [
+                                            "1",
+                                            {
+                                                "Fn::GetAZs": {
+                                                    "Ref": "AWS::Region"
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "Type": "AWS::EC2::RouteTable"
+        },
+        "PrivateSubnetAZ1": {
+            "Metadata": {
+                "Use": "AWS VPC Subnet",
+                "Comments": "Subnet CIDR Range is the taken from the PrivateSubnetCIDRList This is one of two subnets created for services that should not have public IP addresses.  \nMost things should be deployed here.  Please remember that a subnet is specific to an availability zone.\n"
+            },
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "0",
+                        {
+                            "Fn::GetAZs": {
+                                "Ref": "AWS::Region"
+                            }
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Fn::Select": [
+                        "0",
+                        {
+                            "Ref": "PrivateSubnetCIDRList"
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": [
+                                "Private-${AZ}",
+                                {
+                                    "AZ": {
+                                        "Fn::Select": [
+                                            "0",
+                                            {
+                                                "Fn::GetAZs": {
+                                                    "Ref": "AWS::Region"
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "PrivateSubnetAZ1RTBAssoc": {
+            "Metadata": {
+                "Use": "Route Table Association",
+                "Comments": "Associates the private subnet with the correct RTB for that availbility zone.\n"
+            },
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PrivateRTBAZ1"
+                },
+                "SubnetId": {
+                    "Ref": "PrivateSubnetAZ1"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
+        "PrivateSubnetAZ2": {
+            "Metadata": {
+                "Use": "AWS VPC Subnet",
+                "Comments": "Subnet CIDR Range is the taken from the PrivateSubnetCIDRList This is one of two subnets created for services that should not have public IP addresses.  \nMost things should be deployed here.  Please remember that a subnet is specific to an availability zone.\n"
+            },
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "1",
+                        {
+                            "Fn::GetAZs": {
+                                "Ref": "AWS::Region"
+                            }
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Fn::Select": [
+                        "1",
+                        {
+                            "Ref": "PrivateSubnetCIDRList"
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": [
+                                "Private-${AZ}",
+                                {
+                                    "AZ": {
+                                        "Fn::Select": [
+                                            "1",
+                                            {
+                                                "Fn::GetAZs": {
+                                                    "Ref": "AWS::Region"
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "PrivateSubnetAZ2RTBAssoc": {
+            "Metadata": {
+                "Use": "Route Table Association",
+                "Comments": "Associates the private subnet with the correct RTB for that availbility zone.\n"
+            },
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PrivateRTBAZ2"
+                },
+                "SubnetId": {
+                    "Ref": "PrivateSubnetAZ2"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
+        "PublicRTB": {
+            "Metadata": {
+                "Use": "Public Route table",
+                "Comments": "Default route points to IGW when attached.  In current architecture it is no different than the other route tables (default route over Direct Connect)\n"
+            },
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "Public-${AWS::Region}"
+                        }
+                    }
+                ]
+            },
+            "Type": "AWS::EC2::RouteTable"
+        },
+        "PublicSubnetAZ1": {
+            "Condition": "IsNotDevOpsAccount",
+            "Metadata": {
+                "Use": "AWS VPC Subnet",
+                "Comments": "Subnet CIDR Range is the taken from the PublicSubnetCIDRList Typically used for instances that should not have a public IP address.  Currently does not functionally differ from the private subnets since no IGW is attached.\n"
+            },
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "0",
+                        {
+                            "Fn::GetAZs": {
+                                "Ref": "AWS::Region"
+                            }
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Fn::Select": [
+                        "0",
+                        {
+                            "Ref": "PublicSubnetCIDRList"
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": [
+                                "Public-${AZ}",
+                                {
+                                    "AZ": {
+                                        "Fn::Select": [
+                                            "0",
+                                            {
+                                                "Fn::GetAZs": {
+                                                    "Ref": "AWS::Region"
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "PublicSubnetAZ1RTBAssoc": {
+            "Condition": "IsNotDevOpsAccount",
+            "Metadata": {
+                "Use": "Route Table Association",
+                "Comments": "Associates the Public subnet with the correct route table.\n"
+            },
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PublicRTB"
+                },
+                "SubnetId": {
+                    "Ref": "PublicSubnetAZ1"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
+        "PublicSubnetAZ2": {
+            "Condition": "IsNotDevOpsAccount",
+            "Metadata": {
+                "Use": "AWS VPC Subnet",
+                "Comments": "Subnet CIDR Range is the taken from the PublicSubnetCIDRList Typically used for instances that should not have a public IP address.  Currently does not functionally differ from the private subnets since no IGW is attached.\n"
+            },
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "1",
+                        {
+                            "Fn::GetAZs": {
+                                "Ref": "AWS::Region"
+                            }
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Fn::Select": [
+                        "1",
+                        {
+                            "Ref": "PublicSubnetCIDRList"
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": [
+                                "Public-${AZ}",
+                                {
+                                    "AZ": {
+                                        "Fn::Select": [
+                                            "1",
+                                            {
+                                                "Fn::GetAZs": {
+                                                    "Ref": "AWS::Region"
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "PublicSubnetAZ2RTBAssoc": {
+            "Condition": "IsNotDevOpsAccount",
+            "Metadata": {
+                "Use": "Route Table Association",
+                "Comments": "Associates the Public subnet with the correct route table.\n"
+            },
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PublicRTB"
+                },
+                "SubnetId": {
+                    "Ref": "PublicSubnetAZ2"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
+        "PublicSubnetAZ1DevOps": {
+            "Condition": "IsDevOpsAccount",
+            "Metadata": {
+                "Use": "AWS VPC Subnet",
+                "Comments": "Subnet CIDR Range is the taken from the PublicSubnetCIDRList Typically used for instances that should have a public IP address."
+            },
+            "Properties": {
+                "MapPublicIpOnLaunch" : "true",
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "0",
+                        {
+                            "Fn::GetAZs": {
+                                "Ref": "AWS::Region"
+                            }
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Fn::Select": [
+                        "0",
+                        {
+                            "Ref": "PublicSubnetCIDRList"
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": [
+                                "Public-${AZ}",
+                                {
+                                    "AZ": {
+                                        "Fn::Select": [
+                                            "0",
+                                            {
+                                                "Fn::GetAZs": {
+                                                    "Ref": "AWS::Region"
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "PublicSubnetAZ1RTBDevOpsAssoc": {
+            "Condition": "IsDevOpsAccount",
+            "Metadata": {
+                "Use": "Route Table Association",
+                "Comments": "Associates the Public subnet with the correct route table.\n"
+            },
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PublicRTB"
+                },
+                "SubnetId": {
+                    "Ref": "PublicSubnetAZ1DevOps"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
+        "PublicSubnetAZ2DevOps": {
+            "Condition": "IsDevOpsAccount",
+            "Metadata": {
+                "Use": "AWS VPC Subnet",
+                "Comments": "Subnet CIDR Range is the taken from the PublicSubnetCIDRList Typically used for instances that should have a public IP address."
+            },
+            "Properties": {
+                "MapPublicIpOnLaunch" : "true",
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "1",
+                        {
+                            "Fn::GetAZs": {
+                                "Ref": "AWS::Region"
+                            }
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Fn::Select": [
+                        "1",
+                        {
+                            "Ref": "PublicSubnetCIDRList"
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": [
+                                "Public-${AZ}",
+                                {
+                                    "AZ": {
+                                        "Fn::Select": [
+                                            "1",
+                                            {
+                                                "Fn::GetAZs": {
+                                                    "Ref": "AWS::Region"
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "PublicSubnetAZ2RTBAssoc": {
+            "Condition": "IsDevOpsAccount",
+            "Metadata": {
+                "Use": "Route Table Association",
+                "Comments": "Associates the Public subnet with the correct route table.\n"
+            },
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PublicRTB"
+                },
+                "SubnetId": {
+                    "Ref": "PublicSubnetAZ2DevOps"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
+        "VPC": {
+            "Metadata": {
+                "Use": "AWS VPC.",
+                "Comments": "Creates a VPC with a CIDR range that is specified by the parameter VPCCIDR.  Creates Public and Private Subnets across 2 Availability Zones\n"
+            },
+            "Properties": {
+                "CidrBlock": {
+                    "Ref": "VPCCIDR"
+                },
+                "Tags": []
+            },
+            "Type": "AWS::EC2::VPC"
+        },
+        "VPCDHCPOptions": {
+            "Metadata": {
+                "Use": "AWS VPC DHCP Options Set",
+                "Comments": "Sets the default VPC DHCP options.  Used to set the on-prem DNS servers on all ec2 servers, and the correct Domain Name for all the instances FQDN.\n"
+            },
+            "Properties": {
+                "DomainNameServers": [
+                    {
+                        "Ref": "DNSServers"
+                    }
+                ],
+                "DomainName": {
+                    "Ref": "DomainNameDNS"
+                }
+            },
+            "Type": "AWS::EC2::DHCPOptions"
+        },
+        "VPCDHCPOptionsAssociation": {
+            "Metadata": {
+                "Use": "AWS DHCP Options Association.",
+                "Comments": "Associates DHCP Options Set with VPC.\n"
+            },
+            "Properties": {
+                "DhcpOptionsId": {
+                    "Ref": "VPCDHCPOptions"
+                },
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::VPCDHCPOptionsAssociation"
+        },
+        "VPCIGW": {
+            "Metadata": {
+                "Use": "AWS VPC Internet Gateway.",
+                "Comments": "Conditionally created and attached based on the value of the AttachIGW parameter.  Allows for public internet access from AWS, and for instances to have a public ip address.\n"
+            },
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": ""
+                    }
+                ]
+            },
+            "Type": "AWS::EC2::InternetGateway"
+        },
+        "VPCIGWAttachGateway": {
+            "Metadata": {
+                "Use": "Attaches IGW to VPC.",
+                "Comments": "Conditionally created and attached based on the value of the AttachIGW parameter.\n"
+            },
+            "Condition": "IGW",
+            "Properties": {
+                "InternetGatewayId": {
+                    "Ref": "VPCIGW"
+                },
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::VPCGatewayAttachment"
+        },
+        "ToDevOpsPeeringConnection": {
+            "Metadata": {
+                "Use": "Setup a peering connection between the account VPC and the DevOps VPC.",
+                "Comments": "Conditionally created for non-DevOps accounts."
+            },
+            "Type": "AWS::EC2::VPCPeeringConnection",
+            "Condition": "IsNotDevOpsAccount",
+            "DependsOn": "VPC",
+            "Properties": {
+                "VpcId": {"Ref": "VPC"},
+                "PeerOwnerId": {"Ref": "PeerOwnerAWSAccountId"},
+                "PeerVpcId": {"Ref": "DevOpsVPCIDPeering"},
+                "PeerRoleArn": { "Ref": "PeerRoleArn" }
+            }
+        },
+        "PeeringToDevOps" : {
+            "Metadata": {
+                "Use": "Add a route to the DevOps VPC.",
+                "Comments": "Conditionally created for non-DevOps accounts."
+            },
+            "Type" : "AWS::EC2::Route",
+            "Condition": "IsNotDevOpsAccount",
+            "DependsOn" : "ToDevOpsPeeringConnection",
+            "Properties" : {
+                "DestinationCidrBlock": {"Ref": "PeerDestinationCidrBlock"},
+                "RouteTableId" : { "Ref" : "PublicRTB" },
+                "VpcPeeringConnectionId" : { "Ref" : "ToDevOpsPeeringConnection" }
+            }
+        },
+        "PeeringToDevOpsToPublicSubnetAZ1RouteTableAssociation": {
+            "Metadata": {
+                "Use": "Associate the route PublicRTB with the public subnet PublicSubnetAZ1.",
+                "Comments": "Conditionally created for non-DevOps accounts."
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Condition": "IsNotDevOpsAccount",
+            "DependsOn" : "PeeringToDevOps",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PublicSubnetAZ1"
+                },
+                "RouteTableId": {
+                    "Ref": "PublicRTB"
+                }
+            }
+        },
+        "PeeringToDevOpsToPublicSubnetAZ2RouteTableAssociation": {
+            "Metadata": {
+                "Use": "Associate the route PublicRTB with the public subnet PublicSubnetAZ2.",
+                "Comments": "Conditionally created for non-DevOps accounts."
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Condition": "IsNotDevOpsAccount",
+            "DependsOn" : "PeeringToDevOps",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PublicSubnetAZ2"
+                },
+                "RouteTableId": {
+                    "Ref": "PublicRTB"
+                }
+            }
+        }
+    }
+}

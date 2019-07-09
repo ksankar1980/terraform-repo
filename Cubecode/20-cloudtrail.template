@@ -1,0 +1,178 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This is a template that deploys the account specific resources that hook into the enterpise-wide logging infrastructure. This template helps capture CloudTrail logs from this account and send it to the Security account for archival. This script was developed by Cube Networks, and is based on scripts developed by Amazon Web Service. March 2018",
+    "Metadata": {
+        "License": "Any code, applications, scripts, templates, proofs of concept, documentation and other items provided by Cube Networks under this SOW are \"Cube Networks content.\" All such content is provided by Cube Networks and is subject to the terms of the Agreement. The Customer is solely responsible for using, deploying, testing, and supporting any code and applications provided by Cube Networks under this SOW."
+    },
+    "Outputs": {
+        "CloudTrailEventsSNS": {
+            "Description": "SNS topic for account-local notifications on Cloud Trail events.",
+            "Value": {
+                "Ref": "CloudTrailEventSNSTopic"
+            }
+        }
+    },
+    "Parameters": {
+        "CloudTrailBucket": {
+            "Description": "CloudTrail destination bucket for log files.",
+            "Type": "String"
+        },
+        "KMSKeyArn": {
+            "Description": "AWS Key Management Service Key for encrypting CloudTrail logs on S3.",
+            "Type": "String"
+        },
+        "NotificationEmail": {
+            "Description": "Email address to recieve SNS Alerts from Cloud Trail events.",
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "CloudTrailEventSNSTopic": {
+            "Metadata": {
+                "Use": "SNS Topic for CloudTrail log delivery events.",
+                "Comments": "Interested parties can subscribe to this topic to get notified when CloudTrail log delivery events occur.\n"
+            },
+            "Properties": {
+                "DisplayName": "Topic for CloudTrail log delivery events",
+                "Subscription": [
+                    {
+                        "Endpoint": {
+                            "Ref": "NotificationEmail"
+                        },
+                        "Protocol": "email-json"
+                    }
+                ]
+            },
+            "Type": "AWS::SNS::Topic"
+        },
+        "CloudTrailEventSNSTopicPolicy": {
+            "Metadata": {
+                "Use": "Topic policy to allow CloudTrail to send events to the local account SNS Topic",
+                "Comments": "Restricted to only the SNS publish api call on this specific topic.\n"
+            },
+            "DependsOn": "CloudTrailEventSNSTopic",
+            "Properties": {
+                "PolicyDocument": {
+                    "Statement": [
+                        {
+                        "Sid": "AWSCloudTrailSNSPolicy",
+                        "Effect": "Allow",
+                        "Principal": { "Service":"cloudtrail.amazonaws.com"},
+                        "Resource": "*",
+                        "Action": "SNS:Publish"
+                        }
+                    ],
+                    "Version": "2008-10-17"
+                },
+                "Topics": [
+                    {
+                        "Ref": "CloudTrailEventSNSTopic"
+                    }
+                ]
+            },
+            "Type": "AWS::SNS::TopicPolicy"
+        },
+        "CloudTrailLogGroup": {
+            "Metadata": {
+                "Use": "Logging destination for CloudTrail Logs.",
+                "Comments": "Allows for the viewing/searching of the past 14 days of CloudTrail data from within the AWS Console.  Logs are archived in S3 by the CloudTrail for longer term storage.\n"
+            },
+            "Properties": {
+                "RetentionInDays": 14
+            },
+            "Type": "AWS::Logs::LogGroup"
+        },
+        "CloudTrailLogRole": {
+            "Metadata": {
+                "Use": "IAM Role for CloudTrail to deliver logs to CloudWatch Logs.",
+                "Comments": "Only allows access to a specific log group and log-stream prefix.\n"
+            },
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": "sts:AssumeRole",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "cloudtrail.amazonaws.com"
+                            },
+                            "Sid": ""
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyDocument": {
+                            "Statement": [
+                                {
+                                    "Action": [
+                                        "logs:CreateLogStream"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": [
+                                        {
+                                            "Fn::Sub": "${CloudTrailLogGroup.Arn}*"
+                                        }
+                                    ],
+                                    "Sid": "AWSCloudTrailCreateLogStream2014110"
+                                },
+                                {
+                                    "Action": [
+                                        "logs:PutLogEvents"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": [
+                                        {
+                                            "Fn::Sub": "${CloudTrailLogGroup.Arn}*"
+                                        }
+                                    ],
+                                    "Sid": "AWSCloudTrailPutLogEvents20141101"
+                                }
+                            ],
+                            "Version": "2012-10-17"
+                        },
+                        "PolicyName": "root"
+                    }
+                ]
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "CloudTrailTrail": {
+            "Metadata": {
+                "Use": "Enable capture of CloudTrail events.",
+                "Comments": "Enabled for all services and all regions, including global services like S3 and IAM\n"
+            },
+            "Properties": {
+                "CloudWatchLogsLogGroupArn": {
+                    "Fn::GetAtt": [
+                        "CloudTrailLogGroup",
+                        "Arn"
+                    ]
+                },
+                "CloudWatchLogsRoleArn": {
+                    "Fn::GetAtt": [
+                        "CloudTrailLogRole",
+                        "Arn"
+                    ]
+                },
+                "EnableLogFileValidation": true,
+                "IncludeGlobalServiceEvents": true,
+                "IsLogging": true,
+                "IsMultiRegionTrail": true,
+                "KMSKeyId": {
+                    "Ref": "KMSKeyArn"
+                },
+                "S3BucketName": {
+                    "Ref": "CloudTrailBucket"
+                },
+                "S3KeyPrefix": "",
+                "SnsTopicName": {
+                    "Fn::GetAtt":["CloudTrailEventSNSTopic","TopicName"]
+                }
+            },
+            "Type": "AWS::CloudTrail::Trail"
+        }
+    }
+}

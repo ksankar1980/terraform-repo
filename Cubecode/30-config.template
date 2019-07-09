@@ -1,0 +1,227 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This is a template that provides a sample of how to implement config and config rules in cloudformation.  Use this as a jumping off place for alerting on AWS account state change. This script was developed by Cube Networks, and is based on scripts developed by Amazon Web Service. March 2017",
+    "Metadata": {
+        "License": "Any code, applications, scripts, templates, proofs of concept, documentation and other items provided by Cube Networks under this SOW are \"Cube Networks content.\" All such content is provided by Cube Networks and is subject to the terms of the Agreement. The Customer is solely responsible for using, deploying, testing, and supporting any code and applications provided by Cube Networks under this SOW."
+    },
+    "Outputs": {
+        "ConfigEventsSNS": {
+            "Description": "SNS topic for notifications on Config service events.",
+            "Value": {
+                "Ref": "ConfigEventsSNSTopic"
+            }
+        }
+    },
+    "Parameters": {
+        "ConfigLogsBucket": {
+            "Description": "S3Bucket to store AWS Config Service snapshots.",
+            "Type": "String"
+        },
+        "NotificationEmail": {
+            "Description": "Email address to recieve SNS Alerts from Config service events.",
+            "Type": "String"
+        },
+        "RequiredTagKey": {
+            "Description": "Tag key to check for with EC2/EBS REQUIRED_TAGS rule (optional, leave blank to ignore)",
+            "Type": "String",
+            "Default": "CostCenter",
+            "Type": "String"
+         }
+    },
+    "Conditions": {
+        "RequiredTagsRule": {
+            "Fn::Not": [
+                {
+                    "Fn::Equals": [
+                        {
+                            "Ref": "RequiredTagKey"
+                        },
+                        "CostCenter"
+                    ]
+                }
+            ]
+        }
+    },
+    "Resources": {
+        "ConfigEventsSNSTopic": {
+            "Metadata": {
+                "Use": "SNS Topic to send config events to.",
+                "Comments": "Interested parties can subscribe to the topic to recieve notifications about the config events being fired within your enviroment.\n"
+            },
+            "Properties": {
+                "DisplayName": "Topic for config events",
+                "Subscription": [
+                    {
+                        "Endpoint": {
+                            "Ref": "NotificationEmail"
+                        },
+                        "Protocol": "email-json"
+                    }
+                ]
+            },
+            "Type": "AWS::SNS::Topic"
+        },
+        "ConfigEventSNSTopicPolicy": {
+            "Metadata": {
+                "Use": "Topic policy to allow S3 to send events to the local account SNS Topic",
+                "Comments": "Restricted to only the publish api call on this specific topic.\n"
+            },
+            "DependsOn": "ConfigEventsSNSTopic",
+            "Properties": {
+                "PolicyDocument": {
+                    "Statement": [
+                        {
+                        "Sid": "AWSConfigSNSPolicy",
+                        "Effect": "Allow",
+                        "Principal": { "Service":"config.amazonaws.com"},
+                        "Resource": "*",
+                        "Action": "SNS:Publish"
+                        }
+                    ],
+                    "Version": "2008-10-17"
+                },
+                "Topics": [
+                    {
+                        "Ref": "ConfigEventsSNSTopic"
+                    }
+                ]
+            },
+            "Type": "AWS::SNS::TopicPolicy"
+        },
+        "ConfigRecorder": {
+            "Metadata": {
+                "Use": "AWS Config Service Recorder.",
+                "Comments": "Captures changes in the AWS environment. See http://docs.aws.amazon.com/config/latest/developerguide/WhatIsConfig.html for more info on developing for AWS Config.\n"
+            },
+            "DependsOn": ["ConfigEventsSNSTopic"],
+            "Properties": {
+                "RecordingGroup": {
+                    "AllSupported": true,
+                    "IncludeGlobalResourceTypes": true
+                },
+                "RoleARN": {
+                    "Fn::GetAtt": [
+                        "ConfigRole",
+                        "Arn"
+                    ]
+                }
+            },
+            "Type": "AWS::Config::ConfigurationRecorder"
+        },
+        "DeliveryChannel": {
+            "Metadata": {
+                "Use": "Target for the Config Recorder to record account state to.",
+                "Comments": "Logs data to the config s3 bucket, in addition to sending SNS notifications.\n"
+            },
+            "Properties": {
+                "ConfigSnapshotDeliveryProperties": {
+                    "DeliveryFrequency": "One_Hour"
+                },
+                "S3BucketName": {
+                    "Ref": "ConfigLogsBucket"
+                },
+                "SnsTopicARN": {
+                    "Ref": "ConfigEventsSNSTopic"
+                }
+            },
+            "Type": "AWS::Config::DeliveryChannel"
+        },
+        "ConfigRole": {
+            "Metadata": {
+                "Use": "AWS Config Service IAM Role.",
+                "Comments": "Role that the AWS Config service assumes to capture account state information. This role utilizes an AWS Managed policy, which AWS keeps up to date with the required permissions for the Config service.\n"
+            },
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": "sts:AssumeRole",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "config.amazonaws.com"
+                            },
+                            "Sid": ""
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/service-role/AWSConfigRole"
+                ]
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "ConfigRuleForRequiredTags": {
+            "Metadata": {
+                "Use": "Config Rule for tag compliance.",
+                "Comments": "Enforces required tags (CostCenter in this case).  Provided just as a sample to jump off for future tag compliance needs.\n"
+            },
+            "Condition": "RequiredTagsRule",
+            "DependsOn": "ConfigRecorder",
+            "Properties": {
+                "ConfigRuleName": "check-ec2-for-required-tag",
+                "Description": "Checks whether EC2 instances and volumes use the required tag.",
+                "InputParameters": {
+                    "tag1Key": "CostCenter"
+                },
+                "Scope": {
+                    "ComplianceResourceTypes": [
+                        "AWS::EC2::Volume",
+                        "AWS::EC2::Instance"
+                    ]
+                },
+                "Source": {
+                    "Owner": "AWS",
+                    "SourceIdentifier": "REQUIRED_TAGS"
+                }
+            },
+            "Type": "AWS::Config::ConfigRule"
+        },
+        "ConfigRuleForSSH": {
+            "Metadata": {
+                "Use": "Config Rule for SSH compliance.",
+                "Comments": "Checks for open SSH.  Not implemented at this time and provided just as a sample to jump off for future SSH compliance needs.\n"
+            },
+            "DependsOn": "ConfigRecorder",
+            "Properties": {
+                "ConfigRuleName": "check-for-unrestricted-ssh-access",
+                "Description": "Checks whether security groups that are in use disallow unrestricted incoming SSH traffic.",
+                "Scope": {
+                    "ComplianceResourceTypes": [
+                        "AWS::EC2::SecurityGroup"
+                    ]
+                },
+                "Source": {
+                    "Owner": "AWS",
+                    "SourceIdentifier": "INCOMING_SSH_DISABLED"
+                }
+            },
+            "Type": "AWS::Config::ConfigRule"
+        },
+        "ConfigRuleForUnrestrictedPorts": {
+            "Metadata": {
+                "Use": "Config Rule for RDP compliance.",
+                "Comments": "Checks for open RDP.  Not implemented at this time and provided just as a sample to jump off for future SG Complance needs.\n"
+            },
+            "Condition": "RequiredTagsRule",
+            "DependsOn": "ConfigRecorder",
+            "Properties": {
+                "ConfigRuleName": "check-for-unrestricted-ports",
+                "Description": "Checks whether security groups that are in use disallow unrestricted incoming TCP traffic to the specified ports.",
+                "InputParameters": {
+                    "blockedPort1": "3389"
+                },
+                "Scope": {
+                    "ComplianceResourceTypes": [
+                        "AWS::EC2::SecurityGroup"
+                    ]
+                },
+                "Source": {
+                    "Owner": "AWS",
+                    "SourceIdentifier": "RESTRICTED_INCOMING_TRAFFIC"
+                }
+            },
+            "Type": "AWS::Config::ConfigRule"
+        }
+    }
+}

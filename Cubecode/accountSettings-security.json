@@ -1,0 +1,17 @@
+{
+    "AccountSettings":{
+        "AccountType":"Production",
+        "NotificationEmail":"TargetAWSSecurity@target.com.a",
+        "VPC_CIDR":"10.92.8.0/22",
+        "PublicSubnetCIDRList":"10.92.8.0/24, 10.92.9.0/24",
+        "PrivateSubnetCIDRList":"10.92.10.0/24, 10.92.11.0/24",
+        "SAMLMetadataFile":"./SAML.xml"
+    },
+    "Tags" : {
+      "Environment": "Production",
+      "CostCenter" : "security",
+      "Cluster" : "security",
+      "InfoSec" : "InfoSec"
+    }
+}
+

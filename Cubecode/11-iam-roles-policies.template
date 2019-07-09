@@ -1,0 +1,940 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This template that describes a set of roles and policies for use with a SAML federation provider. This script was developed by Cube Networks, and is based on scripts developed by Amazon Web Service. March 2017",
+    "Metadata": {
+        "License": "Any code, applications, scripts, templates, proofs of concept, documentation and other items provided by Cube Networks under this SOW are \"Cube Networks content.\" All such content is provided by Cube Networks and is subject to the terms of the Agreement. The Customer is solely responsible for using, deploying, testing, and supporting any code and applications provided by Cube Networks under this SOW."
+    },
+    "Parameters": {
+        "AccountType": {
+            "Description": "AWS Account Type.",
+            "Type": "String",
+            "AllowedValues": [
+                "Master",
+                "Security",
+                "DevOps",
+                "Application",
+                "Production",
+                "Integration",
+                "Development",
+                "Sandbox"
+            ]
+        },
+        "pIsDevOpsAccount":{
+          "Description": "Determine if this account is the DevOps one.",
+          "Default": "False",
+          "Type": "String"
+        },
+        "FederationProviderARN": {
+            "Description": "Please specify the ARN of the SAML Federation Provider.",
+            "Type": "String"
+        },
+        "VPCFlowLogsBucket": {
+            "Description": "The VPC Flow Logs Bucket in the security account for which we will allow PutObject's to.",
+            "Type": "String"
+        },
+        "KMSKeyArn": {
+            "Description": "AWS KMS Customer Managed Key used for encrypting logs. This value is the 'Key-id' (Arn).",
+            "Type": "String"
+        }
+    },
+    "Conditions": {
+        "CreateMasterResources": {
+            "Fn::Equals": [
+                {
+                    "Ref": "AccountType"
+                },
+                "Master"
+            ]
+        },
+        "CreateSecurityResources": {
+            "Fn::Equals": [
+                {
+                    "Ref": "AccountType"
+                },
+                "Security"
+            ]
+        },
+        "CreateDevOpsResources": {
+            "Fn::Equals": [
+                {
+                    "Ref": "AccountType"
+                },
+                "DevOps"
+            ]
+        },
+        "CreateApplicationResources": {
+            "Fn::Equals": [
+                {
+                    "Ref": "AccountType"
+                },
+                "Application"
+            ]
+        },
+        "IsDevOpsAccount" : {
+          "Fn::Equals": [
+              {
+                  "Ref": "pIsDevOpsAccount"
+              },
+              "True"
+          ]
+        }
+    },
+    "Resources": {
+        "PolicyIAMAttach": {
+            "Type": "AWS::IAM::Policy",
+            "DependsOn": "RoleIAMRoleIAMAttach",
+            "Properties": {
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Action": [
+                                "iam:AttachGroupPolicy",
+                                "iam:AttachRolePolicy"
+                            ],
+                            "Effect": "Allow",
+                            "NotResource": [
+                                "arn:aws:iam::*:role/SAML-IAMAttachRole"
+                            ]
+                        }
+                    ]
+                },
+                "Roles": [
+                    "SAML-IAMAttachRole"
+                ],
+                "PolicyName": "Policy-IAMAttach"
+            }
+        },
+        "PolicyIAMOperator": {
+            "Type": "AWS::IAM::Policy",
+            "DependsOn": "RoleIAMRoleIAMOperator",
+            "Properties": {
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Action": [
+                                "iam:AddUserToGroup",
+                                "iam:ChangePassword",
+                                "iam:CreateAccessKey",
+                                "iam:CreateAccountAlias",
+                                "iam:CreateGroup",
+                                "iam:CreateInstanceProfile",
+                                "iam:CreateLoginProfile",
+                                "iam:CreatePolicy",
+                                "iam:CreatePolicyVersion",
+                                "iam:CreateRole",
+                                "iam:CreateUser",
+                                "iam:CreateVirtualMFADevice",
+                                "iam:DeactivateMFADevice",
+                                "iam:DeleteAccessKey",
+                                "iam:DeleteAccountAlias",
+                                "iam:DeleteGroup",
+                                "iam:DeleteGroupPolicy",
+                                "iam:DeleteInstanceProfile",
+                                "iam:DeleteLoginProfile",
+                                "iam:DeletePolicy",
+                                "iam:DeletePolicyVersion",
+                                "iam:DeleteRole",
+                                "iam:DeleteRolePolicy",
+                                "iam:DeleteSSHPublicKey",
+                                "iam:DeleteServerCertificate",
+                                "iam:DeleteSigningCertificate",
+                                "iam:DeleteUser",
+                                "iam:DeleteUsePolicy",
+                                "iam:DeleteVirtualMFADevice",
+                                "iam:EnableMFADevice",
+                                "iam:GenerateCredentialReport",
+                                "iam:GenerateServiceLastAccessedDetails",
+                                "iam:GetAccessKeyLastUsed",
+                                "iam:GetAccountAuthorizationDetails",
+                                "iam:GetAccountPasswordPolicy",
+                                "iam:GetAccountSummary",
+                                "iam:GetContextKeysForCustomPolicy",
+                                "iam:GetContextKeysForPrincipalPolicy",
+                                "iam:GetCredentialReport",
+                                "iam:GetGroup",
+                                "iam:GetGroupPolicy",
+                                "iam:GetInstanceProfile",
+                                "iam:GetLoginProfile",
+                                "iam:GetOpenIDConnectProvider",
+                                "iam:GetPolicy",
+                                "iam:GetPolicyVersion",
+                                "iam:GetRole",
+                                "iam:GetRolePolicy",
+                                "iam:GetSAMLProvider",
+                                "iam:GetSSHPublicKey",
+                                "iam:GetServerCertificate",
+                                "iam:GetServiceLastAccessedDetails",
+                                "iam:GetServiceLastAccessedDetailsWithEntities",
+                                "iam:GetUser",
+                                "iam:GetUsePolicy",
+                                "iam:ListAccessKeys",
+                                "iam:ListAccountAliases",
+                                "iam:ListAttachedGroupPolicies",
+                                "iam:ListAttachedRolePolicies",
+                                "iam:ListAttachedUserPolicies",
+                                "iam:ListEntitiesFoPolicy",
+                                "iam:ListGroupPolicies",
+                                "iam:ListGroups",
+                                "iam:ListGroupsForUser",
+                                "iam:ListInstanceProfiles",
+                                "iam:ListInstanceProfilesForRole",
+                                "iam:ListMFADevices",
+                                "iam:ListOpenIDConnectProviders",
+                                "iam:ListPolicies",
+                                "iam:ListPoliciesGrantingServiceAccess",
+                                "iam:ListPolicyVersions",
+                                "iam:ListRolePolicies",
+                                "iam:ListRoles",
+                                "iam:ListSAMLProviders",
+                                "iam:ListSSHPublicKeys",
+                                "iam:ListServerCertificates",
+                                "iam:ListSigningCertificates",
+                                "iam:ListUserPolicies",
+                                "iam:ListUsers",
+                                "iam:ListVirtualMFADevices",
+                                "iam:PutGroupPolicy",
+                                "iam:PutRolePolicy",
+                                "iam:PutUsePolicy",
+                                "iam:RemoveUserFromGroup",
+                                "iam:ResyncMFADevice",
+                                "iam:SimulateCustomPolicy",
+                                "iam:SimulatePrincipalPolicy",
+                                "iam:UpdateAccessKey",
+                                "iam:UpdateGroup",
+                                "iam:UpdateLoginProfile",
+                                "iam:UpdateSSHPublicKey",
+                                "iam:UpdateServerCertificate",
+                                "iam:UpdateSigningCertificate",
+                                "iam:UpdateUser",
+                                "iam:UploadSSHPublicKey",
+                                "iam:UploadServerCertificate",
+                                "iam:UploadSigningCertificate"
+                            ],
+                            "Effect": "Allow",
+                            "Resource": "*"
+                        }
+                    ]
+                },
+                "Roles": [
+                    "SAML-IAMOperatorRole"
+                ],
+                "PolicyName": "Policy-IAMOperator"
+            }
+        },
+        "PolicyOrganizationsAdmin": {
+            "Type": "AWS::IAM::Policy",
+            "DependsOn": "RoleIAMRoleOrganizationsAdmin",
+            "Condition": "CreateMasterResources",
+            "Properties": {
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Action": "organizations:*",
+                            "Effect": "Allow",
+                            "Resource": "*"
+                        }
+                    ]
+                },
+                "Roles": [
+                    "SAML-OrganizationsAdminRole"
+                ],
+                "PolicyName": "Policy-OrganizationsAdmin"
+            }
+        },
+        "PolicyOrganizationsOperator": {
+            "Type": "AWS::IAM::Policy",
+            "DependsOn": "RoleIAMRoleOrganizationsOperator",
+            "Condition": "CreateMasterResources",
+            "Properties": {
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                        "Action": [
+                            "organizations:AcceptHandshake",
+                            "organizations:AttachPolicy",
+                            "organizations:CancelHandshake",
+                            "organizations:CreateOrganizationalUnit",
+                            "organizations:CreatePolicy",
+                            "organizations:DeclineHandshake",
+                            "organizations:DeleteOrganizationalUnit",
+                            "organizations:DeletePolicy",
+                            "organizations:DescribeAccount",
+                            "organizations:DescribeCreateAccountStatus",
+                            "organizations:DescribeHandshake",
+                            "organizations:DescribeOrganization",
+                            "organizations:DescribeOrganizationalUnit",
+                            "organizations:DescribePolicy",
+                            "organizations:DetachPolicy",
+                            "organizations:DisablePolicyType",
+                            "organizations:EnableAllFeatures",
+                            "organizations:EnablePolicyType",
+                            "organizations:InviteAccountToOrganization",
+                            "organizations:ListAccounts",
+                            "organizations:ListAccountsForParent",
+                            "organizations:ListChildren",
+                            "organizations:ListCreateAccountStatus",
+                            "organizations:ListHandshakesForAccount",
+                            "organizations:ListHandshakesForOrganization",
+                            "organizations:ListOrganizationalUnitsForParent",
+                            "organizations:ListParents",
+                            "organizations:ListPolicies",
+                            "organizations:ListPoliciesForTarget",
+                            "organizations:ListRoots",
+                            "organizations:ListTargetsForPolicy",
+                            "organizations:MoveAccount",
+                            "organizations:UpdateOrganizationalUnit",
+                            "organizations:UpdatePolicy"
+                        ],
+                        "Effect": "Allow",
+                        "Resource": "*"
+                        }
+                    ]
+                },
+                "Roles": [
+                    "SAML-OrganizationsOperatorRole"
+                ],
+                "PolicyName": "Policy-OrganizationsOperator"
+            }
+        },
+        "PolicyDenyAdminRoleDelete": {
+            "Type": "AWS::IAM::Policy",
+            "DependsOn": [
+                "RoleIAMRoleAWSAdmin",
+                "RoleIAMRoleIAMAdmin",
+                "RoleIAMRoleIAMAttach",
+                "RoleIAMRoleIAMOperator"
+            ],
+            "Properties": {
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Action": [
+                                "iam:DeleteRole",
+                                "iam:DetachRolePolicy"
+                            ],
+                            "Effect": "Deny",
+                            "Resource": [
+                                "arn:aws:iam::*:role/SAML-AWSAdminRole",
+                                "arn:aws:iam::*:role/SAML-IAMAdmin"
+                            ]
+                        }
+                    ]
+                },
+                "Roles": [
+                    "SAML-AWSAdminRole",
+                    "SAML-IAMAdminRole",
+                    "SAML-IAMAttachRole",
+                    "SAML-IAMOperatorRole"
+                ],
+                "PolicyName": "Policy-DenyAdminRoleDelete"
+            }
+        },
+        "RoleIAMRoleAWSAdmin": {
+            "Metadata": {
+                "Use": "IAM Role for AWS Administrator",
+                "Comments": "This is an IAM Role for full administrative access"
+            },
+            "Properties": {
+                "RoleName": "SAML-AWSAdminRole",
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRoleWithSAML"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Federated": [
+                                    {
+                                        "Ref": "FederationProviderARN"
+                                    }
+                                ]
+                            },
+                            "Condition": {
+                                "StringEquals": {
+                                    "SAML:aud": "https://signin.aws.amazon.com/saml"
+                                }
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/",
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/AdministratorAccess"
+                ]
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "RoleIAMRoleDBAdmin": {
+            "Metadata": {
+                "Use": "IAM Role for Database Administrator",
+                "Comments": "This is an IAM Role for Database Administrators using the AWS Managed policy. For a full specification please see https://console.aws.amazon.com/iam/home#policies/arn:aws:iam::aws:policy/job-function/DatabaseAdministrator"
+            },
+            "Properties": {
+                "RoleName": "SAML-DatabaseAdministratorRole",
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRoleWithSAML"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Federated": [
+                                    {
+                                        "Ref": "FederationProviderARN"
+                                    }
+                                ]
+                            },
+                            "Condition": {
+                                "StringEquals": {
+                                    "SAML:aud": "https://signin.aws.amazon.com/saml"
+                                }
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/",
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/job-function/DatabaseAdministrator"
+                ]
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "RoleIAMRoleFinanceAdmin": {
+            "Metadata": {
+                "Use": "IAM Role for Finance Administrator",
+                "Comments": "This is an IAM Role for Finance Administrators using the AWS Managed policy. This role allows users to view billing information, set up payment, and authorize payment. The user can monitor the costs accumulated for each AWS service. For a full list of permissions see https://console.aws.amazon.com/iam/home?#/policies/arn:aws:iam::aws:policy/job-function/Billing"
+            },
+            "Properties": {
+                "RoleName": "SAML-FinanceAdministratorRole",
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRoleWithSAML"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Federated": [
+                                    {
+                                        "Ref": "FederationProviderARN"
+                                    }
+                                ]
+                            },
+                            "Condition": {
+                                "StringEquals": {
+                                    "SAML:aud": "https://signin.aws.amazon.com/saml"
+                                }
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/",
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/job-function/Billing"
+                ]
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "RoleIAMRoleIAMAdmin": {
+            "Metadata": {
+                "Use": "IAM Role for IAM Administrator",
+                "Comments": "This is an IAM Role for full administrative access within IAM"
+            },
+            "Properties": {
+                "RoleName": "SAML-IAMAdminRole",
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRoleWithSAML"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Federated": [
+                                    {
+                                        "Ref": "FederationProviderARN"
+                                    }
+                                ]
+                            },
+                            "Condition": {
+                                "StringEquals": {
+                                    "SAML:aud": "https://signin.aws.amazon.com/saml"
+                                }
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/",
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/IAMFullAccess"
+                ]
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "RoleIAMRoleIAMAttach": {
+            "Metadata": {
+                "Use": "IAM Role for IAM Attach",
+                "Comments": "This is an IAM Role for a user that is only allowed to attach policies to principals"
+            },
+            "Properties": {
+                "RoleName": "SAML-IAMAttachRole",
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRoleWithSAML"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Federated": [
+                                    {
+                                        "Ref": "FederationProviderARN"
+                                    }
+                                ]
+                            },
+                            "Condition": {
+                                "StringEquals": {
+                                    "SAML:aud": "https://signin.aws.amazon.com/saml"
+                                }
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/"
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "RoleIAMRoleIAMOperator": {
+            "Metadata": {
+                "Use": "IAM Role for IAM Operator",
+                "Comments": "This is an IAM Role for an IAM Operator which is allowed to manage IAM principles but not allowed to attach policies to principals."
+            },
+            "Properties": {
+                "RoleName": "SAML-IAMOperatorRole",
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRoleWithSAML"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Federated": [
+                                    {
+                                        "Ref": "FederationProviderARN"
+                                    }
+                                ]
+                            },
+                            "Condition": {
+                                "StringEquals": {
+                                    "SAML:aud": "https://signin.aws.amazon.com/saml"
+                                }
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/"
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "RoleIAMRoleNetworkAdmin": {
+            "Metadata": {
+                "Use": "IAM Role for Network Administrator",
+                "Comments": "This is an IAM Role for Network Administrators using the AWS Managed policy. This policy grants permissions to create and maintain network resources in Amazon EC2, Amazon Route 53, Amazon Virtual Private Cloud (VPC), and AWS Direct Connect. For a full specification please see https://console.aws.amazon.com/iam/home#policies/arn:aws:iam::aws:policy/job-function/NetworkAdministrator"
+            },
+            "Properties": {
+                "RoleName": "SAML-NetworkAdministratorRole",
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRoleWithSAML"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Federated": [
+                                    {
+                                        "Ref": "FederationProviderARN"
+                                    }
+                                ]
+                            },
+                            "Condition": {
+                                "StringEquals": {
+                                    "SAML:aud": "https://signin.aws.amazon.com/saml"
+                                }
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/",
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/job-function/NetworkAdministrator"
+                ]
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "RoleIAMRoleOrganizationsAdmin": {
+            "Metadata": {
+                "Use": "IAM Role for Organizations Administrator",
+                "Comments": "This is an IAM Role for full administrative access to AWS Organizations"
+            },
+            "Condition": "CreateMasterResources",
+            "Properties": {
+                "RoleName": "SAML-OrganizationsAdminRole",
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRoleWithSAML"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Federated": [
+                                    {
+                                        "Ref": "FederationProviderARN"
+                                    }
+                                ]
+                            },
+                            "Condition": {
+                                "StringEquals": {
+                                    "SAML:aud": "https://signin.aws.amazon.com/saml"
+                                }
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/"
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "RoleIAMRoleOrganizationsOperator": {
+            "Metadata": {
+                "Use": "IAM Role for Organizations Operator",
+                "Comments": "This is an IAM Role for AWS Organizations Operators. They are only allowed regular Organizations tasks."
+            },
+            "Condition": "CreateMasterResources",
+            "Properties": {
+                "RoleName": "SAML-OrganizationsOperatorRole",
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRoleWithSAML"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Federated": [
+                                    {
+                                        "Ref": "FederationProviderARN"
+                                    }
+                                ]
+                            },
+                            "Condition": {
+                                "StringEquals": {
+                                    "SAML:aud": "https://signin.aws.amazon.com/saml"
+                                }
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/"
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "RoleIAMRoleSecurityAuditor": {
+            "Metadata": {
+                "Use": "IAM Role for Security Auditor",
+                "Comments": "This is an IAM Role for Security Auditors using the AWS Managed policy. This role allows users to monitors accounts for compliance with security requirements. This role allows users to access logs and events to investigate potential security breaches or potential malicious activity. For a full list of permissions see https://console.aws.amazon.com/iam/home?#/policies/arn:aws:iam::aws:policy/job-function/SecurityAudit"
+            },
+            "Properties": {
+                "RoleName": "SAML-SecurityAuditorRole",
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRoleWithSAML"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Federated": [
+                                    {
+                                        "Ref": "FederationProviderARN"
+                                    }
+                                ]
+                            },
+                            "Condition": {
+                                "StringEquals": {
+                                    "SAML:aud": "https://signin.aws.amazon.com/saml"
+                                }
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/",
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/SecurityAudit"
+                ]
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "RoleIAMRoleSystemAdmin": {
+            "Metadata": {
+                "Use": "IAM Role for System Administrator",
+                "Comments": "This is an IAM Role for System Administrators using the AWS Managed policy. This policy grants permissions to create and maintain resources across a large variety of AWS services, including AWS CloudTrail, Amazon CloudWatch, AWS CodeCommit, AWS CodeDeploy, AWS Config, AWS Directory Service, Amazon EC2, AWS Identity and Access Management, AWS Key Management Service, AWS Lambda, Amazon RDS, Amazon Route 53, Amazon S3, Amazon SES, Amazon SQS and AWS Trusted Advisor. For a full list of permissions see https://console.aws.amazon.com/iam/home?#/policies/arn:aws:iam::aws:policy/job-function/SystemAdministrator"
+            },
+            "Properties": {
+                "RoleName": "SAML-SystemAdministratorRole",
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRoleWithSAML"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Federated": [
+                                    {
+                                        "Ref": "FederationProviderARN"
+                                    }
+                                ]
+                            },
+                            "Condition": {
+                                "StringEquals": {
+                                    "SAML:aud": "https://signin.aws.amazon.com/saml"
+                                }
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/",
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/job-function/SystemAdministrator"
+                ]
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "RoleIAMRoleReadOnly": {
+            "Metadata": {
+                "Use": "IAM Role for Read Only User",
+                "Comments": "This is an IAM Role for users with Read Only access using the AWS Managed policy. This policy grants permissions to read everything in the AWS account but not create, delete or modify anything."
+            },
+            "Properties": {
+                "RoleName": "SAML-ReadOnlyRole",
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRoleWithSAML"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Federated": [
+                                    {
+                                        "Ref": "FederationProviderARN"
+                                    }
+                                ]
+                            },
+                            "Condition": {
+                                "StringEquals": {
+                                    "SAML:aud": "https://signin.aws.amazon.com/saml"
+                                }
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/",
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/ReadOnlyAccess"
+                ]
+            },
+            "Type": "AWS::IAM::Role"
+        },
+        "RoleVPCPeering": {
+          "Metadata": {
+              "Use": "IAM Role for accepting peeering connection in the DevOps account.",
+              "Comments": "This role will be created only in the DevOps account. Other accounts can assume the role to add themselves in the peering connection. The Principal (AWS Account ID) will be changed dinamically every time a new account is created, than the DevOps AWS Account ID will be reset as the Principal."
+          },
+          "Type": "AWS::IAM::Role",
+          "Condition" : "IsDevOpsAccount",
+          "Properties": {
+            "AssumeRolePolicyDocument": {
+              "Statement": [
+                {
+                  "Principal": {
+                    "AWS": {"Ref" : "AWS::AccountId"}
+                  },
+                  "Action": [
+                    "sts:AssumeRole"
+                  ],
+                  "Effect": "Allow"
+                }
+              ]
+            },
+            "Path": "/",
+            "Policies": [
+              {
+                "PolicyName": "root",
+                "PolicyDocument": {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Effect": "Allow",
+                      "Action": "ec2:AcceptVpcPeeringConnection",
+                      "Resource": "*"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "KinesisToS3Role": {
+            "Metadata": {
+                "Use": "IAM role for Kinesis to write to S3, for VPC Flow Logs processing.",
+                "Comments": "Granularly allows required permissions for VPC Flow logs to be delivered to S3 by Kinesis Firehose.\n"
+            },
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": "sts:AssumeRole",
+                            "Condition": {
+                                "StringEquals": {
+                                    "sts:ExternalId": [
+                                        {"Ref": "AWS::AccountId"}
+                                    ]
+                                }
+                            },
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "firehose.amazonaws.com"
+                            },
+                            "Sid": "KinesisToS3TrustPolicy"
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyDocument": {
+                            "Statement": [
+                                {
+                                    "Action": [
+                                        "s3:AbortMultipartUpload",
+                                        "s3:GetBucketLocation",
+                                        "s3:GetObject",
+                                        "s3:ListBucket",
+                                        "s3:ListBucketMultipartUploads",
+                                        "s3:PutObjectAcl",
+                                        "s3:PutObject"
+                                        ],
+                                    "Effect": "Allow",
+                                    "Resource": [
+                                        {"Fn::Sub": "arn:aws:s3:::${VPCFlowLogsBucket}"},
+                                        {"Fn::Sub": "arn:aws:s3:::${VPCFlowLogsBucket}/*"}
+                                    ],
+                                    "Sid": ""
+                                },
+                                {
+                                    "Action": [
+                                        "logs:PutLogEvents",
+                                        "logs:CreateLogStream"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": [
+                                        "arn:aws:logs:*:*:log-group:*:log-stream:KinesisToS3ErrorLogGroupStream"
+                                    ],
+                                    "Sid": ""
+                                },
+                                {
+                                    "Action": [
+                                        "kms:Encrypt",
+                                        "kms:Decrypt",
+                                        "kms:ReEncrypt*",
+                                        "kms:GenerateDataKey*",
+                                        "kms:DescribeKey"
+                                    ],
+                                    "Effect": "Allow",
+                                    "Resource": [
+                                        {"Ref": "KMSKeyArn"}
+                                    ],
+                                    "Condition": {
+                                        "StringEquals": {
+                                            "kms:ViaService": {
+                                                "Fn::Sub": "s3.${AWS::Region}.amazonaws.com"
+                                            }
+                                        },
+                                        "StringLike": {
+                                            "kms:EncryptionContext:aws:s3:arn":  [
+                                                {"Fn::Sub": "arn:aws:s3:::${VPCFlowLogsBucket}"},
+                                                {"Fn::Sub": "arn:aws:s3:::${VPCFlowLogsBucket}/*"}
+                                            ]
+                                        }
+                                    },
+                                    "Sid": ""
+                                }
+                            ],
+                            "Version": "2012-10-17"
+                        },
+                        "PolicyName": "s3perms"
+                    }
+                ]
+            },
+            "Type": "AWS::IAM::Role"
+        }
+    },
+    "Outputs": {
+      "RoleVPCPeeringARN": {
+      "Description": "The ARN of the role to be assumed in other AWS Accounts to create and accept a peering connection on the DevOps account",
+      "Condition" : "IsDevOpsAccount",
+        "Value": {
+          "Fn::GetAtt": [
+            "RoleVPCPeering",
+            "Arn"
+          ]
+        }
+      },
+      "RoleVPCPeeringName": {
+        "Description": "The name of the role to be assumed in other AWS Accounts to create and accept a peering connection on the DevOps account",
+        "Condition" : "IsDevOpsAccount",
+        "Value" : {
+          "Ref" : "RoleVPCPeering"
+        }
+      },
+      "RoleKinesisToS3Role": {
+        "Description": "The name of the role to be assumed by Kinesis to push data to S3",
+        "Value" : {
+          "Ref" : "KinesisToS3Role"
+        }
+      },
+      "RoleKinesisToS3RoleARN": {
+        "Description": "The ARN of the role to be assumed by Kinesis to push data to S3",
+        "Value" : {
+          "Fn::GetAtt": [
+            "KinesisToS3Role",
+            "Arn"
+          ]
+        }
+      }
+    }
+}

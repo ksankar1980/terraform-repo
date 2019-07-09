@@ -1,0 +1,16 @@
+{
+    "AccountSettings":{
+        "AccountType":"Production",
+        "NotificationEmail":"TargetAWSDigitalPrd@target.com.au",
+        "VPC_CIDR":"10.92.32.0/20",
+        "PublicSubnetCIDRList":"10.92.32.0/22, 10.92.36.0/22",
+        "PrivateSubnetCIDRList":"10.92.40.0/22, 10.92.44.0/22",
+        "SAMLMetadataFile":"./SAML.xml"
+    },
+    "Tags" : {
+      "Environment": "Production",
+      "CostCenter" : "devops",
+      "Cluster" : "devops",
+      "InfoSec" : "InfoSec"
+    }
+}

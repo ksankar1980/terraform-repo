@@ -1,0 +1,46 @@
+{
+  "AWSTemplateFormatVersion":"2010-09-09",
+  "Description":"This is a template that creates the IAM breakglass user and Group-IAMBreakglass group. This script was developed by Cube Networks, and is based on scripts developed by Amazon Web Service. March 2018",
+  "Metadata":{
+    "License": "Any code, applications, scripts, templates, proofs of concept, documentation and other items provided by Cube Networks under this SOW are \"Cube Networks content.\" All such content is provided by Cube Networks and is subject to the terms of the Agreement. The Customer is solely responsible for using, deploying, testing, and supporting any code and applications provided by Cube Networks under this SOW."
+  },
+  "Resources":{
+	        "PolicyOrganizationsAdmin": {
+            "Type": "AWS::IAM::Policy",
+            
+            "Properties": {
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+            "Sid": "BlockEC2Accesswithoutmfa",
+            "Effect": "Allow",
+            "Action": "ec2:*",
+            "Resource": "*",
+            "Condition": {
+                "BoolIfExists": {
+                    "aws:MultiFactorAuthPresent": "true"
+                }
+            }
+        }
+    ],
+       "PolicyName": "IAM-Policy-MFA4EC2"
+            }
+			}
+		},
+		    "IAMGroup":{
+			"Metadata": {
+			"Use": "A IAM group that will have all MFA policies assigned to",
+          "Comments": "All IAM users will be a member of this Group to ensure MFA is enabled for all IAM users. If no MFA then they will not be able to perform any actions."
+      },
+      "Type":"AWS::IAM::Group",
+      "Properties":{
+        "GroupName":"IAM-Group-MFARequired",
+        "ManagedPolicyArns":[
+          "arn:aws:iam::aws:policy/IAM-Policy-MFA4EC2"
+        ],
+        "Path":"/"
+      }
+    }
+        }
+  }

@@ -1,0 +1,395 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "This template creates Windows 2012 R2 or Windows 2016 EC2 instances, using the standard AMIs available. This script was developed by Cube Networks, and is based on scripts developed by Amazon Web Service. March 2018",
+  "Metadata": {
+    "License": "Any code, applications, scripts, templates, proofs of concept, documentation and other items provided by Cube Networks under this SOW are \"Cube Networks content.\" All such content is provided by Cube Networks and is subject to the terms of the Agreement. The Customer is solely responsible for using, deploying, testing, and supporting any code and applications provided by Cube Networks under this SOW."
+  },
+  "Parameters": {
+    "EBSSize": {
+      "Description": "EBS VolumeSize. For Windows the minimum size is 100GB",
+      "Type": "Number",
+      "Default": 100
+    },
+    "EBSSecondDriveSize": {
+      "Description": "EBS VolumeSize for second volume. set to 0 to skip creation of second volume",
+      "Type": "Number",
+      "Default": 100
+    },
+    "Environment": {
+      "Default": "Development",
+      "AllowedValues": [
+        "Development",
+        "Integration",
+        "Production"
+      ],
+      "Description": "Which environment is this ainstance for (Development, Integration, Production)",
+      "Type": "String",
+      "Default": "Development"
+    },
+    "Hostname": {
+      "Description": "A non mandatory tag for Instance Hostname",
+      "Default": "Hostname",
+      "Type": "String"
+    },
+    "KeyName": {
+      "Description": "KeyPair to retrieve instance password",
+      "Type": "AWS::EC2::KeyPair::KeyName"
+    },
+    "SubnetId": {
+      "Description": "Subnet for instance to use",
+      "Type": "String"
+    },
+    "VpcId": {
+      "Description": "VPC to launch into",
+      "Type": "AWS::EC2::VPC::Id"
+    },
+    "RequestorName": {
+      "Description": "A non mandatory tag for Requestor",
+      "Default": "Requestor Name",
+      "Type": "String"
+    },
+    "RequestorEmail": {
+      "Description": "Requestor for notifications (email required)",
+      "Type": "String"
+    },
+    "SystemOwner": {
+      "Description": "A non mandatory tag for System Owner",
+      "Default": "System Owner",
+      "Type": "String"
+    },
+    "SystemManager": {
+      "Description": "A non mandatory tag for System Manage",
+      "Default": "sSystem Manage",
+      "Type": "String"
+    },
+    "SystemAdministrator": {
+      "Description": "A unique AD group name with access to",
+      "Default": "System Administrator",
+      "Type": "String"
+    },
+    "SystemName": {
+      "Description": "A non mandatory tag for System Name",
+      "Default": "System Name",
+      "Type": "String"
+    },
+    "InstanceType": {
+      "Description": "Instance Type. Only t2.micro and t2.small are allowed",
+      "AllowedValues" : ["t2.micro", "t2.small"],
+      "Default": "t2.micro",
+      "Type": "String"
+    },
+    "ApplicationId": {
+      "Description": "A non mandatory tag for  Application ID",
+      "Default": "Application ID",
+      "Type": "String"
+    },
+    "ApplicationRole": {
+      "Description": "A non mandatory tag for Application Role",
+      "Default": "Application Role",
+      "Type": "String"
+    },
+    "Retention": {
+      "Description": "A non mandatory tag to describe the number of days to retain snapshots",
+      "Default": 30,
+      "Type": "String"
+    },
+    "CostCenter": {
+      "Description": "A non mandatory tag for Cost Center ",
+      "Default": "Cost Center",
+      "Type": "String"
+    },
+    "Cluster": {
+      "Description": "A non mandatory tag for Cluster which the instances belongs to",
+      "Default": "Cluster",
+      "Type": "String"
+    },
+    "InfoSec": {
+      "Description": "A non mandatory tag for reserved for Infosec",
+      "Default": "INFOSEC",
+      "Type": "String"
+    },
+    "InstanceName": {
+      "Default": "A non mandatory tag for InstanceName",
+      "Description": "The name of the instance, as shown in the Console",
+      "Type": "String"
+    },
+    "OsType" : {
+      "Default": "WIN2016",
+      "Description": "The Operating system of choice (WIN2K12R2 or WIN2016)",
+      "Type": "String"
+    },
+    "SecurityGroup" : {
+      "Description": "The security group(s) to which the instance belongs",
+      "Type": "String"
+    },
+    "DetailedMonitoring" : {
+      "Description" : "Enable Detaild Monitoring",
+      "Type" : "String"
+    }
+  },
+  "Mappings" : {
+    "AMIMapping" : {
+      "eu-west-1" : { "WIN2K12R2" : "ami-96d4daf0", "WIN2016" : "ami-6e283d08"},
+      "eu-central-1" : { "WIN2K12R2" : "ami-f9528c96", "WIN2016": "ami-0f2ff760"}
+    }
+  },
+  "Conditions": {
+    "SecondDrive": {
+      "Fn::Not": [
+        {
+          "Fn::Or": [
+            {
+              "Fn::Equals": [
+                "",
+                {
+                  "Ref": "EBSSecondDriveSize"
+                }
+              ]
+            },
+            {
+              "Fn::Equals": [
+                "0",
+                {
+                  "Ref": "EBSSecondDriveSize"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "SecondVolume": {
+      "Metadata": {
+        "Use": "The size of the second volume.",
+        "Comments": "Set to 0 if only the primary volume is needed."
+      },
+      "Condition": "SecondDrive",
+      "Type": "AWS::EC2::Volume",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::GetAtt": [
+            "EC2Instance",
+            "AvailabilityZone"
+          ]
+        },
+        "Encrypted": false,
+        "VolumeType": "gp2",
+        "Size": {
+          "Ref": "EBSSecondDriveSize"
+        }
+      }
+    },
+    "SecondVolumeAttach": {
+      "Metadata": {
+        "Use": "Attach the second volume to the instance, if the second volume is created."
+      },
+      "Condition": "SecondDrive",
+      "Type": "AWS::EC2::VolumeAttachment",
+      "Properties": {
+        "Device": "/dev/sdf",
+        "InstanceId": {
+          "Ref": "EC2Instance"
+        },
+        "VolumeId": {
+          "Ref": "SecondVolume"
+        }
+      }
+    },
+    "EC2Instance": {
+      "Metadata": {
+        "Use": "EC2 instance.",
+        "Comments": "Base install of a Windows EC2 instance."
+      },
+      "Properties": {
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "VolumeType": "gp2",
+              "VolumeSize": {
+                "Ref": "EBSSize"
+              }
+            }
+          }
+        ],
+        "ImageId": {
+          "Fn::FindInMap" : [
+            "AMIMapping", {
+              "Ref" : "AWS::Region"
+              }, {"Ref" : "OsType"}
+            ]
+          },
+          "InstanceType": {
+            "Ref": "InstanceType"
+          },
+          "KeyName": {
+            "Ref": "KeyName"
+          },
+          "Monitoring": {
+            "Ref" : "DetailedMonitoring"
+          },
+          "SecurityGroupIds": [
+            {
+              "Ref": "SecurityGroup"
+            }
+          ],
+          "SubnetId": {
+            "Ref": "SubnetId"
+          },
+          "UserData": {
+            "Fn::Base64": {
+              "Fn::Sub": "<powershell>\nRename-Computer -NewName ${Hostname} -Force\n</powershell>\n"
+            }
+          },
+          "Tags": [
+            {
+              "Key": "RequestorName",
+              "Value": {
+                "Ref": "RequestorName"
+              }
+            },
+            {
+              "Key": "SystemOwner",
+              "Value": {
+                "Ref": "SystemOwner"
+              }
+            },
+            {
+              "Key": "SystemManager",
+              "Value": {
+                "Ref": "SystemManager"
+              }
+            },
+            {
+              "Key": "SystemAdministrator",
+              "Value": {
+                "Ref": "SystemAdministrator"
+              }
+            },
+            {
+              "Key": "SystemName",
+              "Value": {
+                "Ref": "SystemName"
+              }
+            },
+            {
+              "Key": "ApplicationId",
+              "Value": {
+                "Ref": "ApplicationId"
+              }
+            },
+            {
+              "Key": "AppliationRole",
+              "Value": {
+                "Ref": "ApplicationRole"
+              }
+            },
+            {
+              "Key": "Retention",
+              "Value": {
+                "Ref": "Retention"
+              }
+            },
+            {
+              "Key": "CostCenter",
+              "Value": {
+                "Ref": "CostCenter"
+              }
+            },
+            {
+              "Key": "Environment",
+              "Value": {
+                "Ref": "Environment"
+              }
+            },
+            {
+              "Key": "Cluster",
+              "Value": {
+                "Ref": "Cluster"
+              }
+            },
+            {
+              "Key": "InfoSec",
+              "Value": {
+                "Ref": "InfoSec"
+              }
+            },
+            {
+              "Key": "Hostname",
+              "Value": {
+                "Ref": "Hostname"
+              }
+            },
+            {
+              "Key": "Name",
+              "Value": {
+                "Ref": "InstanceName"
+              }
+            }
+          ]
+        },
+        "Type": "AWS::EC2::Instance"
+      },
+      "RecoveryAlarm": {
+        "Metadata": {
+          "Use": "Recovery Alarm for ec2 instance.",
+          "Comments": "Will automatically reboot the ec2 instance after 15 minutes if the instance fails a status check (IE. Kernel Panic, etc).\n"
+        },
+        "Properties": {
+          "AlarmActions": [
+            {
+              "Fn::Sub": "arn:aws:automate:${AWS::Region}:ec2:recover"
+            },
+            {
+              "Ref": "AppEventsSNS"
+            }
+          ],
+          "AlarmDescription": "Trigger a recovery when instance status check fails for 15 consecutive minutes.",
+          "ComparisonOperator": "GreaterThanThreshold",
+          "Dimensions": [
+            {
+              "Name": "InstanceId",
+              "Value": {
+                "Ref": "EC2Instance"
+              }
+            }
+          ],
+          "EvaluationPeriods": "15",
+          "MetricName": "StatusCheckFailed_System",
+          "Namespace": "AWS/EC2",
+          "Period": "60",
+          "Statistic": "Minimum",
+          "Threshold": "0"
+        },
+        "Type": "AWS::CloudWatch::Alarm"
+      },
+      "AppEventsSNS": {
+        "Metadata": {
+          "Use": "SNS Topic for Instance Notifications.",
+          "Comments": "Currently instance recovery alarms send a message to this topic when they are triggered.\n"
+        },
+        "Properties": {
+          "DisplayName": "Topic for App events",
+          "Subscription": [
+            {
+              "Endpoint": {
+                "Ref": "RequestorEmail"
+              },
+              "Protocol": "email-json"
+            }
+          ]
+        },
+        "Type": "AWS::SNS::Topic"
+      }
+    },
+    "Outputs": {
+      "EC2Instance": {
+        "Description": "The EC2 instance Id (i-xxxxxxxxxxxxxxxxx).",
+        "Value": {
+          "Ref": "EC2Instance"
+        }
+      }
+    }
+  }

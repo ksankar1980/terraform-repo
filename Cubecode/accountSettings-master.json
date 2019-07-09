@@ -1,0 +1,16 @@
+{
+    "AccountSettings":{
+        "AccountType":"Production",
+        "NotificationEmail":"yourmailmaster@organization.com",
+        "VPC_CIDR":"10.84.16.0/20",
+        "PublicSubnetCIDRList":"10.84.16.0/23, 10.84.18.0/23",
+        "PrivateSubnetCIDRList":"10.84.31.0/25, 10.84.31.128/25",
+        "SAMLMetadataFile":"./SAML.xml"
+    },
+    "Tags" : {
+      "Environment": "Production",
+      "CostCenter" : "devops",
+      "Cluster" : "devops",
+      "InfoSec" : "InfoSec"
+    }
+} 
